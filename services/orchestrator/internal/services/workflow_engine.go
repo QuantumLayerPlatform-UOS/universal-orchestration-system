@@ -9,8 +9,7 @@ import (
 	"orchestrator/internal/models"
 	"github.com/redis/go-redis/v9"
 	"go.temporal.io/sdk/client"
-	"go.temporal.io/sdk/worker"
-	"go.temporal.io/sdk/workflow"
+	"go.temporal.io/sdk/temporal"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -33,7 +32,7 @@ type WorkflowConfig struct {
 	MaxConcurrentActivities int
 	WorkflowTimeout         time.Duration
 	ActivityTimeout         time.Duration
-	RetryPolicy             *workflow.RetryPolicy
+	RetryPolicy             *temporal.RetryPolicy
 	EnableMetrics           bool
 	EnableTracing           bool
 }
@@ -296,21 +295,23 @@ func (e *WorkflowEngine) GetWorkflowMetrics(ctx context.Context, workflowID stri
 	return metrics, nil
 }
 
-// getWorkflowFunction returns the appropriate workflow function based on type
+// getWorkflowFunction returns the appropriate workflow function name based on type
 func (e *WorkflowEngine) getWorkflowFunction(workflowType models.WorkflowType) interface{} {
+	// Return workflow function names as strings
+	// The actual workflow functions will be registered separately with the Temporal worker
 	switch workflowType {
 	case models.WorkflowTypeIntent:
-		return e.IntentProcessingWorkflow
+		return "IntentProcessingWorkflow"
 	case models.WorkflowTypeExecution:
-		return e.CodeExecutionWorkflow
+		return "CodeExecutionWorkflow"
 	case models.WorkflowTypeAnalysis:
-		return e.CodeAnalysisWorkflow
+		return "CodeAnalysisWorkflow"
 	case models.WorkflowTypeReview:
-		return e.CodeReviewWorkflow
+		return "CodeReviewWorkflow"
 	case models.WorkflowTypeDeployment:
-		return e.DeploymentWorkflow
+		return "DeploymentWorkflow"
 	default:
-		return e.CustomWorkflow
+		return "CustomWorkflow"
 	}
 }
 

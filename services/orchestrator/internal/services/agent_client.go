@@ -97,7 +97,12 @@ func (c *AgentClient) CreateAgent(ctx context.Context, req *CreateAgentRequest) 
 	defer span.End()
 
 	url := fmt.Sprintf("%s/api/v1/agents", c.config.BaseURL)
-	return c.doRequest(ctx, http.MethodPost, url, req, &Agent{})
+	var agent Agent
+	_, err := c.doRequest(ctx, http.MethodPost, url, req, &agent)
+	if err != nil {
+		return nil, err
+	}
+	return &agent, nil
 }
 
 // GetAgent retrieves agent details
@@ -110,7 +115,12 @@ func (c *AgentClient) GetAgent(ctx context.Context, agentID string) (*Agent, err
 	defer span.End()
 
 	url := fmt.Sprintf("%s/api/v1/agents/%s", c.config.BaseURL, agentID)
-	return c.doRequest(ctx, http.MethodGet, url, nil, &Agent{})
+	var agent Agent
+	_, err := c.doRequest(ctx, http.MethodGet, url, nil, &agent)
+	if err != nil {
+		return nil, err
+	}
+	return &agent, nil
 }
 
 // ListAgents lists agents with filters
@@ -128,7 +138,12 @@ func (c *AgentClient) ListAgents(ctx context.Context, filters *AgentFilters) (*A
 		}
 	}
 
-	return c.doRequest(ctx, http.MethodGet, url, nil, &AgentList{})
+	var agentList AgentList
+	_, err := c.doRequest(ctx, http.MethodGet, url, nil, &agentList)
+	if err != nil {
+		return nil, err
+	}
+	return &agentList, nil
 }
 
 // UpdateAgent updates agent configuration
@@ -141,7 +156,12 @@ func (c *AgentClient) UpdateAgent(ctx context.Context, agentID string, req *Upda
 	defer span.End()
 
 	url := fmt.Sprintf("%s/api/v1/agents/%s", c.config.BaseURL, agentID)
-	return c.doRequest(ctx, http.MethodPut, url, req, &Agent{})
+	var agent Agent
+	_, err := c.doRequest(ctx, http.MethodPut, url, req, &agent)
+	if err != nil {
+		return nil, err
+	}
+	return &agent, nil
 }
 
 // DeleteAgent deletes an agent
@@ -169,7 +189,12 @@ func (c *AgentClient) ExecuteTask(ctx context.Context, agentID string, req *Exec
 	defer span.End()
 
 	url := fmt.Sprintf("%s/api/v1/agents/%s/execute", c.config.BaseURL, agentID)
-	return c.doRequest(ctx, http.MethodPost, url, req, &TaskExecution{})
+	var taskExecution TaskExecution
+	_, err := c.doRequest(ctx, http.MethodPost, url, req, &taskExecution)
+	if err != nil {
+		return nil, err
+	}
+	return &taskExecution, nil
 }
 
 // GetTaskStatus retrieves task execution status
@@ -183,7 +208,12 @@ func (c *AgentClient) GetTaskStatus(ctx context.Context, agentID, taskID string)
 	defer span.End()
 
 	url := fmt.Sprintf("%s/api/v1/agents/%s/tasks/%s", c.config.BaseURL, agentID, taskID)
-	return c.doRequest(ctx, http.MethodGet, url, nil, &TaskExecution{})
+	var taskExecution TaskExecution
+	_, err := c.doRequest(ctx, http.MethodGet, url, nil, &taskExecution)
+	if err != nil {
+		return nil, err
+	}
+	return &taskExecution, nil
 }
 
 // CancelTask cancels a running task

@@ -17,7 +17,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
-	"go.temporal.io/sdk/client"
+	sdktemporal "go.temporal.io/sdk/temporal"
 	"go.uber.org/zap"
 
 	"orchestrator/internal/api"
@@ -113,7 +113,7 @@ func main() {
 		MaxConcurrentActivities: cfg.Temporal.MaxConcurrentActivities,
 		WorkflowTimeout:         30 * time.Minute,
 		ActivityTimeout:         5 * time.Minute,
-		RetryPolicy: &client.RetryPolicy{
+		RetryPolicy: &sdktemporal.RetryPolicy{
 			InitialInterval:    time.Second,
 			BackoffCoefficient: 2.0,
 			MaximumInterval:    time.Minute,

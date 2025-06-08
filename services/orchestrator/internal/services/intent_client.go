@@ -124,8 +124,8 @@ func (c *IntentClient) ProcessIntent(ctx context.Context, req *ProcessIntentRequ
 			Type:        req.Type,
 			Content:     req.Content,
 			Context:     req.Context,
-			Parameters:  req.Parameters,
-			Constraints: req.Constraints,
+			Parameters:  convertMapToString(req.Parameters),
+			Constraints: convertMapToString(req.Constraints),
 		},
 		ProjectId: req.ProjectID,
 		UserId:    req.UserID,
@@ -172,7 +172,7 @@ func (c *IntentClient) ProcessIntent(ctx context.Context, req *ProcessIntentRequ
 		IntentID:    resp.IntentId,
 		Status:      resp.Status,
 		Message:     resp.Message,
-		Result:      resp.Result,
+		Result:      convertMapToInterface(resp.Result),
 		Confidence:  resp.Confidence,
 		Actions:     convertActions(resp.Actions),
 		Suggestions: resp.Suggestions,
@@ -287,9 +287,9 @@ func convertActions(pbActions []*pb.Action) []Action {
 			ID:          a.Id,
 			Type:        a.Type,
 			Description: a.Description,
-			Parameters:  a.Parameters,
+			Parameters:  convertMapToInterface(a.Parameters),
 			Status:      a.Status,
-			Result:      a.Result,
+			Result:      convertMapToInterface(a.Result),
 		}
 	}
 	return actions
@@ -308,6 +308,34 @@ func convertEntities(pbEntities []*pb.Entity) []Entity {
 		}
 	}
 	return entities
+}
+
+// convertMapToString converts map[string]interface{} to map[string]string
+func convertMapToString(input map[string]interface{}) map[string]string {
+	if input == nil {
+		return nil
+	}
+	result := make(map[string]string)
+	for k, v := range input {
+		if v != nil {
+			result[k] = fmt.Sprintf("%v", v)
+		} else {
+			result[k] = ""
+		}
+	}
+	return result
+}
+
+// convertMapToInterface converts map[string]string to map[string]interface{}
+func convertMapToInterface(input map[string]string) map[string]interface{} {
+	if input == nil {
+		return nil
+	}
+	result := make(map[string]interface{})
+	for k, v := range input {
+		result[k] = v
+	}
+	return result
 }
 
 // Request and response types

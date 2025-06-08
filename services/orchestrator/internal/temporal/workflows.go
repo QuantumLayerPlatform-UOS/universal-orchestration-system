@@ -10,7 +10,6 @@ import (
 	"go.uber.org/zap"
 
 	"orchestrator/internal/models"
-	"orchestrator/internal/services"
 )
 
 // WorkflowEngine implements Temporal workflows
@@ -50,14 +49,14 @@ func (w *WorkflowEngine) IntentProcessingWorkflow(ctx workflow.Context, wf *mode
 	}
 
 	var analysisResult IntentAnalysisResult
-	err := workflow.ExecuteActivity(ctx, AnalyzeIntentActivity, intentData).Get(ctx, &analysisResult)
+	err := workflow.ExecuteActivity(ctx, "AnalyzeIntentActivity", intentData).Get(ctx, &analysisResult)
 	if err != nil {
 		return fmt.Errorf("intent analysis failed: %w", err)
 	}
 
 	// Step 2: Create execution plan
 	var executionPlan ExecutionPlan
-	err = workflow.ExecuteActivity(ctx, CreateExecutionPlanActivity, analysisResult).Get(ctx, &executionPlan)
+	err = workflow.ExecuteActivity(ctx, "CreateExecutionPlanActivity", analysisResult).Get(ctx, &executionPlan)
 	if err != nil {
 		return fmt.Errorf("failed to create execution plan: %w", err)
 	}
@@ -68,7 +67,7 @@ func (w *WorkflowEngine) IntentProcessingWorkflow(ctx workflow.Context, wf *mode
 		if len(step.DependsOn) == 0 {
 			// Execute independent steps in parallel
 			var stepResult StepResult
-			err = workflow.ExecuteActivity(ctx, ExecuteStepActivity, step).Get(ctx, &stepResult)
+			err = workflow.ExecuteActivity(ctx, "ExecuteStepActivity", step).Get(ctx, &stepResult)
 			if err != nil {
 				return fmt.Errorf("step execution failed: %w", err)
 			}
@@ -78,7 +77,7 @@ func (w *WorkflowEngine) IntentProcessingWorkflow(ctx workflow.Context, wf *mode
 
 	// Step 4: Aggregate results
 	var finalResult WorkflowResult
-	err = workflow.ExecuteActivity(ctx, AggregateResultsActivity, results).Get(ctx, &finalResult)
+	err = workflow.ExecuteActivity(ctx, "AggregateResultsActivity", results).Get(ctx, &finalResult)
 	if err != nil {
 		return fmt.Errorf("failed to aggregate results: %w", err)
 	}
@@ -116,34 +115,34 @@ func (w *WorkflowEngine) CodeExecutionWorkflow(ctx workflow.Context, wf *models.
 
 	// Step 2: Select appropriate agent
 	var agent AgentInfo
-	err := workflow.ExecuteActivity(ctx, SelectAgentActivity, execRequest).Get(ctx, &agent)
+	err := workflow.ExecuteActivity(ctx, "SelectAgentActivity", execRequest).Get(ctx, &agent)
 	if err != nil {
 		return fmt.Errorf("failed to select agent: %w", err)
 	}
 
 	// Step 3: Prepare execution environment
 	var envInfo EnvironmentInfo
-	err = workflow.ExecuteActivity(ctx, PrepareEnvironmentActivity, agent, execRequest).Get(ctx, &envInfo)
+	err = workflow.ExecuteActivity(ctx, "PrepareEnvironmentActivity", agent, execRequest).Get(ctx, &envInfo)
 	if err != nil {
 		return fmt.Errorf("failed to prepare environment: %w", err)
 	}
 
 	// Step 4: Execute code
 	var execResult ExecutionResult
-	err = workflow.ExecuteActivity(ctx, ExecuteCodeActivity, agent, envInfo, execRequest).Get(ctx, &execResult)
+	err = workflow.ExecuteActivity(ctx, "ExecuteCodeActivity", agent, envInfo, execRequest).Get(ctx, &execResult)
 	if err != nil {
 		return fmt.Errorf("code execution failed: %w", err)
 	}
 
 	// Step 5: Process results
 	var processedResult ProcessedResult
-	err = workflow.ExecuteActivity(ctx, ProcessResultsActivity, execResult).Get(ctx, &processedResult)
+	err = workflow.ExecuteActivity(ctx, "ProcessResultsActivity", execResult).Get(ctx, &processedResult)
 	if err != nil {
 		return fmt.Errorf("failed to process results: %w", err)
 	}
 
 	// Step 6: Cleanup environment
-	err = workflow.ExecuteActivity(ctx, CleanupEnvironmentActivity, envInfo).Get(ctx, nil)
+	err = workflow.ExecuteActivity(ctx, "CleanupEnvironmentActivity", envInfo).Get(ctx, nil)
 	if err != nil {
 		// Log but don't fail workflow for cleanup errors
 		logger.Error("Failed to cleanup environment", zap.Error(err))
@@ -182,7 +181,7 @@ func (w *WorkflowEngine) CodeAnalysisWorkflow(ctx workflow.Context, wf *models.W
 
 	// Step 2: Fetch code
 	var codeData CodeData
-	err := workflow.ExecuteActivity(ctx, FetchCodeActivity, analysisRequest).Get(ctx, &codeData)
+	err := workflow.ExecuteActivity(ctx, "FetchCodeActivity", analysisRequest).Get(ctx, &codeData)
 	if err != nil {
 		return fmt.Errorf("failed to fetch code: %w", err)
 	}
@@ -191,21 +190,21 @@ func (w *WorkflowEngine) CodeAnalysisWorkflow(ctx workflow.Context, wf *models.W
 	selector := workflow.NewSelector(ctx)
 
 	// Static analysis
-	staticFuture := workflow.ExecuteActivity(ctx, RunStaticAnalysisActivity, codeData)
+	staticFuture := workflow.ExecuteActivity(ctx, "RunStaticAnalysisActivity", codeData)
 	var staticResult StaticAnalysisResult
 	selector.AddFuture(staticFuture, func(f workflow.Future) {
 		f.Get(ctx, &staticResult)
 	})
 
 	// Security analysis
-	securityFuture := workflow.ExecuteActivity(ctx, RunSecurityAnalysisActivity, codeData)
+	securityFuture := workflow.ExecuteActivity(ctx, "RunSecurityAnalysisActivity", codeData)
 	var securityResult SecurityAnalysisResult
 	selector.AddFuture(securityFuture, func(f workflow.Future) {
 		f.Get(ctx, &securityResult)
 	})
 
 	// Performance analysis
-	perfFuture := workflow.ExecuteActivity(ctx, RunPerformanceAnalysisActivity, codeData)
+	perfFuture := workflow.ExecuteActivity(ctx, "RunPerformanceAnalysisActivity", codeData)
 	var perfResult PerformanceAnalysisResult
 	selector.AddFuture(perfFuture, func(f workflow.Future) {
 		f.Get(ctx, &perfResult)
@@ -218,7 +217,7 @@ func (w *WorkflowEngine) CodeAnalysisWorkflow(ctx workflow.Context, wf *models.W
 
 	// Step 4: Generate report
 	var report AnalysisReport
-	err = workflow.ExecuteActivity(ctx, GenerateAnalysisReportActivity, 
+	err = workflow.ExecuteActivity(ctx, "GenerateAnalysisReportActivity", 
 		staticResult, securityResult, perfResult).Get(ctx, &report)
 	if err != nil {
 		return fmt.Errorf("failed to generate analysis report: %w", err)
@@ -257,35 +256,35 @@ func (w *WorkflowEngine) CodeReviewWorkflow(ctx workflow.Context, wf *models.Wor
 
 	// Step 2: Fetch code changes
 	var codeChanges CodeChanges
-	err := workflow.ExecuteActivity(ctx, FetchCodeChangesActivity, reviewRequest).Get(ctx, &codeChanges)
+	err := workflow.ExecuteActivity(ctx, "FetchCodeChangesActivity", reviewRequest).Get(ctx, &codeChanges)
 	if err != nil {
 		return fmt.Errorf("failed to fetch code changes: %w", err)
 	}
 
 	// Step 3: Run automated checks
 	var automatedChecks AutomatedCheckResults
-	err = workflow.ExecuteActivity(ctx, RunAutomatedChecksActivity, codeChanges).Get(ctx, &automatedChecks)
+	err = workflow.ExecuteActivity(ctx, "RunAutomatedChecksActivity", codeChanges).Get(ctx, &automatedChecks)
 	if err != nil {
 		return fmt.Errorf("failed to run automated checks: %w", err)
 	}
 
 	// Step 4: AI-powered review
 	var aiReview AIReviewResult
-	err = workflow.ExecuteActivity(ctx, RunAIReviewActivity, codeChanges, automatedChecks).Get(ctx, &aiReview)
+	err = workflow.ExecuteActivity(ctx, "RunAIReviewActivity", codeChanges, automatedChecks).Get(ctx, &aiReview)
 	if err != nil {
 		return fmt.Errorf("failed to run AI review: %w", err)
 	}
 
 	// Step 5: Generate review summary
 	var reviewSummary ReviewSummary
-	err = workflow.ExecuteActivity(ctx, GenerateReviewSummaryActivity, automatedChecks, aiReview).Get(ctx, &reviewSummary)
+	err = workflow.ExecuteActivity(ctx, "GenerateReviewSummaryActivity", automatedChecks, aiReview).Get(ctx, &reviewSummary)
 	if err != nil {
 		return fmt.Errorf("failed to generate review summary: %w", err)
 	}
 
 	// Step 6: Post review comments (if configured)
 	if reviewRequest.PostComments {
-		err = workflow.ExecuteActivity(ctx, PostReviewCommentsActivity, reviewSummary).Get(ctx, nil)
+		err = workflow.ExecuteActivity(ctx, "PostReviewCommentsActivity", reviewSummary).Get(ctx, nil)
 		if err != nil {
 			logger.Error("Failed to post review comments", zap.Error(err))
 		}
@@ -324,7 +323,7 @@ func (w *WorkflowEngine) DeploymentWorkflow(ctx workflow.Context, wf *models.Wor
 
 	// Step 2: Validate deployment
 	var validation DeploymentValidation
-	err := workflow.ExecuteActivity(ctx, ValidateDeploymentActivity, deployRequest).Get(ctx, &validation)
+	err := workflow.ExecuteActivity(ctx, "ValidateDeploymentActivity", deployRequest).Get(ctx, &validation)
 	if err != nil {
 		return fmt.Errorf("deployment validation failed: %w", err)
 	}
@@ -335,14 +334,14 @@ func (w *WorkflowEngine) DeploymentWorkflow(ctx workflow.Context, wf *models.Wor
 
 	// Step 3: Build artifacts
 	var buildResult BuildResult
-	err = workflow.ExecuteActivity(ctx, BuildArtifactsActivity, deployRequest).Get(ctx, &buildResult)
+	err = workflow.ExecuteActivity(ctx, "BuildArtifactsActivity", deployRequest).Get(ctx, &buildResult)
 	if err != nil {
 		return fmt.Errorf("build failed: %w", err)
 	}
 
 	// Step 4: Run tests
 	var testResult TestResult
-	err = workflow.ExecuteActivity(ctx, RunDeploymentTestsActivity, buildResult).Get(ctx, &testResult)
+	err = workflow.ExecuteActivity(ctx, "RunDeploymentTestsActivity", buildResult).Get(ctx, &testResult)
 	if err != nil {
 		return fmt.Errorf("tests failed: %w", err)
 	}
@@ -350,39 +349,39 @@ func (w *WorkflowEngine) DeploymentWorkflow(ctx workflow.Context, wf *models.Wor
 	// Step 5: Deploy to staging (if configured)
 	if deployRequest.DeployToStaging {
 		var stagingResult DeploymentResult
-		err = workflow.ExecuteActivity(ctx, DeployToStagingActivity, buildResult).Get(ctx, &stagingResult)
+		err = workflow.ExecuteActivity(ctx, "DeployToStagingActivity", buildResult).Get(ctx, &stagingResult)
 		if err != nil {
 			return fmt.Errorf("staging deployment failed: %w", err)
 		}
 
 		// Run smoke tests on staging
 		var smokeTestResult TestResult
-		err = workflow.ExecuteActivity(ctx, RunSmokeTestsActivity, stagingResult).Get(ctx, &smokeTestResult)
+		err = workflow.ExecuteActivity(ctx, "RunSmokeTestsActivity", stagingResult).Get(ctx, &smokeTestResult)
 		if err != nil {
 			// Rollback staging
-			workflow.ExecuteActivity(ctx, RollbackDeploymentActivity, stagingResult).Get(ctx, nil)
+			workflow.ExecuteActivity(ctx, "RollbackDeploymentActivity", stagingResult).Get(ctx, nil)
 			return fmt.Errorf("staging smoke tests failed: %w", err)
 		}
 	}
 
 	// Step 6: Deploy to production
 	var prodResult DeploymentResult
-	err = workflow.ExecuteActivity(ctx, DeployToProductionActivity, buildResult).Get(ctx, &prodResult)
+	err = workflow.ExecuteActivity(ctx, "DeployToProductionActivity", buildResult).Get(ctx, &prodResult)
 	if err != nil {
 		return fmt.Errorf("production deployment failed: %w", err)
 	}
 
 	// Step 7: Health check
 	var healthCheck HealthCheckResult
-	err = workflow.ExecuteActivity(ctx, RunHealthCheckActivity, prodResult).Get(ctx, &healthCheck)
+	err = workflow.ExecuteActivity(ctx, "RunHealthCheckActivity", prodResult).Get(ctx, &healthCheck)
 	if err != nil || !healthCheck.IsHealthy {
 		// Rollback production
-		workflow.ExecuteActivity(ctx, RollbackDeploymentActivity, prodResult).Get(ctx, nil)
+		workflow.ExecuteActivity(ctx, "RollbackDeploymentActivity", prodResult).Get(ctx, nil)
 		return fmt.Errorf("health check failed: %w", err)
 	}
 
 	// Step 8: Update deployment status
-	err = workflow.ExecuteActivity(ctx, UpdateDeploymentStatusActivity, prodResult).Get(ctx, nil)
+	err = workflow.ExecuteActivity(ctx, "UpdateDeploymentStatusActivity", prodResult).Get(ctx, nil)
 	if err != nil {
 		logger.Error("Failed to update deployment status", zap.Error(err))
 	}
@@ -421,7 +420,7 @@ func (w *WorkflowEngine) CustomWorkflow(ctx workflow.Context, wf *models.Workflo
 		stepCtx := workflow.WithActivityOptions(ctx, ao)
 
 		var stepResult interface{}
-		err := workflow.ExecuteActivity(stepCtx, ExecuteCustomStepActivity, step).Get(stepCtx, &stepResult)
+		err := workflow.ExecuteActivity(stepCtx, "ExecuteCustomStepActivity", step).Get(stepCtx, &stepResult)
 		if err != nil {
 			if step.ContinueOnError {
 				logger.Warn("Custom step failed but continuing", 

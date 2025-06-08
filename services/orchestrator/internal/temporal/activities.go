@@ -444,19 +444,21 @@ func convertToStringMap(m map[string]interface{}) map[string]string {
 }
 
 func getProjectIDFromContext(ctx context.Context) string {
-	// Get from activity info or context
-	info := activity.GetInfo(ctx)
-	if projectID, ok := info.WorkflowExecution.Memo.Get("project_id").(string); ok {
-		return projectID
+	// Get from activity context values
+	if val := ctx.Value("project_id"); val != nil {
+		if projectID, ok := val.(string); ok {
+			return projectID
+		}
 	}
 	return ""
 }
 
 func getUserIDFromContext(ctx context.Context) string {
-	// Get from activity info or context
-	info := activity.GetInfo(ctx)
-	if userID, ok := info.WorkflowExecution.Memo.Get("user_id").(string); ok {
-		return userID
+	// Get from activity context values
+	if val := ctx.Value("user_id"); val != nil {
+		if userID, ok := val.(string); ok {
+			return userID
+		}
 	}
 	return ""
 }

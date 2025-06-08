@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"orchestrator/internal/models"
 	"orchestrator/internal/services"
 	"go.uber.org/zap"
 	"gorm.io/gorm"

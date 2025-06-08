@@ -47,22 +47,19 @@ func NewWorker(
 
 	// Create worker
 	w := worker.New(temporalClient, cfg.TaskQueue, worker.Options{
-		MaxConcurrentActivityExecutionSize:     cfg.WorkerOptions.MaxConcurrentActivityExecutionSize,
-		MaxConcurrentWorkflowTaskExecutionSize: cfg.WorkerOptions.MaxConcurrentWorkflowTaskExecutionSize,
+		MaxConcurrentActivityExecutionSize:      cfg.WorkerOptions.MaxConcurrentActivityExecutionSize,
+		MaxConcurrentWorkflowTaskExecutionSize:  cfg.WorkerOptions.MaxConcurrentWorkflowTaskExecutionSize,
 		MaxConcurrentLocalActivityExecutionSize: cfg.WorkerOptions.MaxConcurrentLocalActivityExecutionSize,
-		WorkerActivitiesPerSecond:              cfg.WorkerOptions.WorkerActivitiesPerSecond,
-		TaskQueueActivitiesPerSecond:           cfg.WorkerOptions.TaskQueueActivitiesPerSecond,
-		MaxTaskQueueActivitiesPerSecond:        cfg.WorkerOptions.MaxTaskQueueActivitiesPerSecond,
-		WorkerLocalActivitiesPerSecond:         cfg.WorkerOptions.WorkerLocalActivitiesPerSecond,
-		TaskQueueLocalActivitiesPerSecond:      cfg.WorkerOptions.TaskQueueLocalActivitiesPerSecond,
-		EnableLoggingInReplay:                  true,
-		DisableWorkflowWorker:                  false,
-		DisableActivityWorker:                  false,
-		LocalActivityWorkerOnly:                false,
-		Identity:                               "orchestrator-worker",
-		DeadlockDetectionTimeout:               0, // Use default
-		MaxHeartbeatThrottleInterval:           0, // Use default
-		DefaultHeartbeatThrottleInterval:       0, // Use default
+		WorkerActivitiesPerSecond:               cfg.WorkerOptions.WorkerActivitiesPerSecond,
+		TaskQueueActivitiesPerSecond:            cfg.WorkerOptions.TaskQueueActivitiesPerSecond,
+		WorkerLocalActivitiesPerSecond:          cfg.WorkerOptions.WorkerLocalActivitiesPerSecond,
+		EnableLoggingInReplay:                   true,
+		DisableWorkflowWorker:                   false,
+		LocalActivityWorkerOnly:                 false,
+		Identity:                                "orchestrator-worker",
+		DeadlockDetectionTimeout:                0, // Use default
+		MaxHeartbeatThrottleInterval:            0, // Use default
+		DefaultHeartbeatThrottleInterval:        0, // Use default
 	})
 
 	// Register workflows
@@ -120,9 +117,6 @@ func createTemporalClient(cfg *config.TemporalConfig, logger *zap.Logger) (clien
 		Logger:    NewTemporalLogger(logger),
 		ConnectionOptions: client.ConnectionOptions{
 			TLS:                          nil, // Configure TLS if needed
-			DisableHealthCheck:           false,
-			HealthCheckAttemptTimeout:    0, // Use default
-			HealthCheckTimeout:           0, // Use default
 			EnableKeepAliveCheck:         cfg.ClientOptions.EnableKeepAlive,
 			KeepAliveTime:                0, // Use default
 			KeepAliveTimeout:             0, // Use default
