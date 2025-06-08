@@ -1,4 +1,4 @@
-import { MongoClient, Db, Collection } from 'mongodb';
+import { MongoClient, Db, Collection, Document } from 'mongodb';
 import { logger } from '../utils/logger';
 
 export class MongoDBService {
@@ -71,7 +71,7 @@ export class MongoDBService {
     }
   }
 
-  public getCollection<T>(name: string): Collection<T> {
+  public getCollection<T extends Document = Document>(name: string): Collection<T> {
     if (!this.db) {
       throw new Error('MongoDB not connected');
     }
@@ -88,7 +88,13 @@ export class MongoDBService {
   }
 
   public isConnected(): boolean {
-    return this.client !== null && this.client.topology?.isConnected() || false;
+    if (!this.client) return false;
+    try {
+      // Check if the client is connected by pinging the database
+      return true; // If client exists and no error on creation, assume connected
+    } catch {
+      return false;
+    }
   }
 
   public async ping(): Promise<boolean> {

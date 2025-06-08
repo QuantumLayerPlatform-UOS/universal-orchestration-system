@@ -7,7 +7,7 @@ import { EventEmitter } from 'events';
 export class AgentRegistry extends EventEmitter {
   private agents: Map<string, Agent> = new Map();
   private mongoService: MongoDBService;
-  private heartbeatInterval: NodeJS.Timer | null = null;
+  private heartbeatInterval: NodeJS.Timeout | null = null;
   private readonly HEARTBEAT_TIMEOUT = 30000; // 30 seconds
   private readonly HEARTBEAT_CHECK_INTERVAL = 10000; // 10 seconds
   private subscribers: ((agents: Agent[]) => void)[] = [];

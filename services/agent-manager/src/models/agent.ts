@@ -1,4 +1,4 @@
-import { ObjectId } from 'mongodb';
+import { ObjectId, Document } from 'mongodb';
 
 export enum AgentType {
   CODE_GEN = 'code-gen',
@@ -52,7 +52,7 @@ export interface AgentMetrics {
   memoryUsage?: number;
 }
 
-export interface Agent {
+export interface Agent extends Document {
   _id?: ObjectId;
   id: string;
   name: string;
@@ -73,7 +73,7 @@ export interface Agent {
   updatedAt: Date;
 }
 
-export interface Task {
+export interface Task extends Document {
   _id?: ObjectId;
   id: string;
   type: AgentType;

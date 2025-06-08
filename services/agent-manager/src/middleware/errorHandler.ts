@@ -1,14 +1,14 @@
 import { Request, Response, NextFunction } from 'express';
 import { logger } from '../utils/logger';
 
-interface ApiError extends Error {
+interface ApiErrorInterface extends Error {
   statusCode?: number;
   code?: string;
   details?: any;
 }
 
 export const errorHandler = (
-  err: ApiError,
+  err: ApiErrorInterface,
   req: Request,
   res: Response,
   next: NextFunction

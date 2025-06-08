@@ -36,7 +36,7 @@ export class MetricsService extends EventEmitter {
     failed: number;
     totalProcessingTime: number;
   };
-  private metricsInterval: NodeJS.Timer | null = null;
+  private metricsInterval: NodeJS.Timeout | null = null;
 
   constructor() {
     super();

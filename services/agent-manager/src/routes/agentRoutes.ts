@@ -3,7 +3,7 @@ import { AgentRegistry } from '../services/agentRegistry';
 import { AgentOrchestrator } from '../services/agentOrchestrator';
 import { validateRequest, schemas } from '../middleware/validateRequest';
 import { ApiError, NotFoundError } from '../middleware/errorHandler';
-import { AgentFilter, AgentStatus } from '../models/agent';
+import { AgentFilter, AgentStatus, AgentType } from '../models/agent';
 import Joi from 'joi';
 
 export const agentRoutes = (
@@ -46,10 +46,10 @@ export const agentRoutes = (
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const filter: AgentFilter = {
-          type: req.query.type as any,
-          status: req.query.status as any,
-          capabilities: req.query.capabilities as string[],
-          tags: req.query.tags as string[],
+          type: req.query.type ? req.query.type as AgentType : undefined,
+          status: req.query.status ? req.query.status as AgentStatus : undefined,
+          capabilities: Array.isArray(req.query.capabilities) ? req.query.capabilities as string[] : undefined,
+          tags: Array.isArray(req.query.tags) ? req.query.tags as string[] : undefined,
           region: req.query.region as string
         };
 
@@ -193,7 +193,7 @@ export const agentRoutes = (
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
-        const agents = agentRegistry.getAvailableAgents(req.params.type as any);
+        const agents = agentRegistry.getAvailableAgents(req.params.type as AgentType);
         
         res.json({
           type: req.params.type,

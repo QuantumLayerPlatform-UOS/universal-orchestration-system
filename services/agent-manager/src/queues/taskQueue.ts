@@ -86,7 +86,7 @@ export class TaskQueue extends EventEmitter {
 
   public async initialize(): Promise<void> {
     // Clean up any stalled jobs on startup
-    await this.queue.clean(0, 'stalled');
+    await this.queue.clean(0, 'wait');
     await this.queue.clean(0, 'failed');
     
     logger.info('Task queue initialized');

@@ -91,7 +91,7 @@ export const taskRoutes = (
       try {
         const tasks = await taskQueue.getTasksByStatus(
           req.params.status as TaskStatus,
-          req.query.limit as number
+          Number(req.query.limit)
         );
 
         res.json({
@@ -120,7 +120,7 @@ export const taskRoutes = (
       try {
         const tasks = await taskQueue.getTasksByPriority(
           parseInt(req.params.priority) as TaskPriority,
-          req.query.limit as number
+          Number(req.query.limit)
         );
 
         res.json({

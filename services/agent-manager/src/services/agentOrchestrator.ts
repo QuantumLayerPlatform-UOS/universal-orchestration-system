@@ -28,7 +28,7 @@ export class AgentOrchestrator extends EventEmitter {
   private strategies: Map<string, OrchestrationStrategy> = new Map();
   private concurrencyLimit = pLimit(10); // Limit concurrent orchestrations
   private readonly ASSIGNMENT_TIMEOUT = 300000; // 5 minutes
-  private assignmentCheckInterval: NodeJS.Timer | null = null;
+  private assignmentCheckInterval: NodeJS.Timeout | null = null;
 
   constructor(agentRegistry: AgentRegistry, taskQueue: TaskQueue) {
     super();
