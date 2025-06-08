@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/quantumlayer/uos/services/orchestrator/internal/models"
+	"orchestrator/internal/models"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )

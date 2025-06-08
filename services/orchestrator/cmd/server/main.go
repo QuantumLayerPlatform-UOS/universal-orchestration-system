@@ -20,12 +20,12 @@ import (
 	"go.temporal.io/sdk/client"
 	"go.uber.org/zap"
 
-	"github.com/quantumlayer/uos/services/orchestrator/internal/api"
-	"github.com/quantumlayer/uos/services/orchestrator/internal/config"
-	"github.com/quantumlayer/uos/services/orchestrator/internal/database"
-	"github.com/quantumlayer/uos/services/orchestrator/internal/middleware"
-	"github.com/quantumlayer/uos/services/orchestrator/internal/services"
-	"github.com/quantumlayer/uos/services/orchestrator/internal/temporal"
+	"orchestrator/internal/api"
+	"orchestrator/internal/config"
+	"orchestrator/internal/database"
+	"orchestrator/internal/middleware"
+	"orchestrator/internal/services"
+	"orchestrator/internal/temporal"
 )
 
 func main() {

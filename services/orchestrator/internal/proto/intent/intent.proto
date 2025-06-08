@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package intent.v1;
 
-option go_package = "github.com/quantumlayer/uos/services/orchestrator/internal/proto/intent;intent";
+option go_package = "orchestrator/internal/proto/intent;intent";
 
 import "google/protobuf/timestamp.proto";
 

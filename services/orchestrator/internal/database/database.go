@@ -9,7 +9,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
-	"github.com/quantumlayer/uos/services/orchestrator/internal/models"
+	"orchestrator/internal/models"
 )
 
 // Connect establishes a database connection

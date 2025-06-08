@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/quantumlayer/uos/services/orchestrator/internal/models"
-	"github.com/quantumlayer/uos/services/orchestrator/internal/services"
+	"orchestrator/internal/models"
+	"orchestrator/internal/services"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )

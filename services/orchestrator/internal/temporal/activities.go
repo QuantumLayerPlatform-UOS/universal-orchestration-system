@@ -10,8 +10,8 @@ import (
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 
-	"github.com/quantumlayer/uos/services/orchestrator/internal/models"
-	"github.com/quantumlayer/uos/services/orchestrator/internal/services"
+	"orchestrator/internal/models"
+	"orchestrator/internal/services"
 )
 
 // Activities contains all activity implementations

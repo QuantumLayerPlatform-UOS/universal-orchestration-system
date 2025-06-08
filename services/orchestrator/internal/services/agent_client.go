@@ -16,7 +16,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 
-	"github.com/quantumlayer/uos/services/orchestrator/internal/config"
+	"orchestrator/internal/config"
 )
 
 // AgentClient handles communication with the Agent Manager service

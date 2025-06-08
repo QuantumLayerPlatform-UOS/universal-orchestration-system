@@ -11,8 +11,8 @@ import (
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 
-	"github.com/quantumlayer/uos/services/orchestrator/internal/config"
-	"github.com/quantumlayer/uos/services/orchestrator/internal/services"
+	"orchestrator/internal/config"
+	"orchestrator/internal/services"
 )
 
 // Worker represents a Temporal worker

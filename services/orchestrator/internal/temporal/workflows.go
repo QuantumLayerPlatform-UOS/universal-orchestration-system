@@ -9,8 +9,8 @@ import (
 	"go.temporal.io/sdk/workflow"
 	"go.uber.org/zap"
 
-	"github.com/quantumlayer/uos/services/orchestrator/internal/models"
-	"github.com/quantumlayer/uos/services/orchestrator/internal/services"
+	"orchestrator/internal/models"
+	"orchestrator/internal/services"
 )
 
 // WorkflowEngine implements Temporal workflows

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/quantumlayer/uos/services/orchestrator/internal/models"
+	"orchestrator/internal/models"
 	"github.com/redis/go-redis/v9"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/worker"

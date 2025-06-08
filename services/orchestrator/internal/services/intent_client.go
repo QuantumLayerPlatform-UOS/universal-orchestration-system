@@ -18,8 +18,8 @@ import (
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/metadata"
 
-	"github.com/quantumlayer/uos/services/orchestrator/internal/config"
-	pb "github.com/quantumlayer/uos/services/orchestrator/internal/proto/intent"
+	"orchestrator/internal/config"
+	pb "orchestrator/internal/proto/intent"
 )
 
 // IntentClient handles communication with the Intent Processor service
