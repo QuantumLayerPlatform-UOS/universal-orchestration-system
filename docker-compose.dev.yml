@@ -1,0 +1,251 @@
+version: '3.8'
+
+services:
+  # Core Services
+  orchestrator:
+    build:
+      context: ./services/orchestrator
+      dockerfile: Dockerfile
+    container_name: qlp-orchestrator
+    ports:
+      - "8080:8080"
+      - "8081:8081" # Health/metrics port
+    environment:
+      - SERVICE_NAME=orchestrator
+      - SERVICE_VERSION=1.0.0
+      - LOG_LEVEL=debug
+      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/orchestrator_db?sslmode=disable
+      - REDIS_URL=redis://redis:6379
+      - TEMPORAL_HOST=temporal:7233
+      - JAEGER_AGENT_HOST=jaeger
+      - JAEGER_AGENT_PORT=6831
+      - METRICS_PORT=8081
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      temporal:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - qlp-network
+
+  intent-processor:
+    build:
+      context: ./services/intent-processor
+      dockerfile: Dockerfile
+    container_name: qlp-intent-processor
+    ports:
+      - "8082:8082"
+      - "8083:8083" # Health/metrics port
+    environment:
+      - SERVICE_NAME=intent-processor
+      - SERVICE_VERSION=1.0.0
+      - LOG_LEVEL=debug
+      - REDIS_URL=redis://redis:6379
+      - TEMPORAL_HOST=temporal:7233
+      - ORCHESTRATOR_URL=http://orchestrator:8080
+      - JAEGER_AGENT_HOST=jaeger
+      - JAEGER_AGENT_PORT=6831
+      - METRICS_PORT=8083
+    depends_on:
+      redis:
+        condition: service_healthy
+      temporal:
+        condition: service_started
+      orchestrator:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - qlp-network
+
+  agent-manager:
+    build:
+      context: ./services/agent-manager
+      dockerfile: Dockerfile
+    container_name: qlp-agent-manager
+    ports:
+      - "8084:8084"
+      - "8085:8085" # Health/metrics port
+    environment:
+      - SERVICE_NAME=agent-manager
+      - SERVICE_VERSION=1.0.0
+      - LOG_LEVEL=debug
+      - MONGODB_URL=mongodb://mongodb:27017/agent_manager_db
+      - REDIS_URL=redis://redis:6379
+      - TEMPORAL_HOST=temporal:7233
+      - ORCHESTRATOR_URL=http://orchestrator:8080
+      - JAEGER_AGENT_HOST=jaeger
+      - JAEGER_AGENT_PORT=6831
+      - METRICS_PORT=8085
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      temporal:
+        condition: service_started
+      orchestrator:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8085/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - qlp-network
+
+  # Infrastructure Services
+  postgres:
+    image: postgres:15-alpine
+    container_name: qlp-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=orchestrator_db
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - qlp-network
+
+  mongodb:
+    image: mongo:6-jammy
+    container_name: qlp-mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=agent_manager_db
+    volumes:
+      - mongodb-data:/data/db
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - qlp-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: qlp-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - qlp-network
+
+  # Temporal Workflow Engine
+  temporal:
+    image: temporalio/auto-setup:1.22.4
+    container_name: qlp-temporal
+    ports:
+      - "7233:7233"
+    environment:
+      - DB=postgresql
+      - DB_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PWD=postgres
+      - POSTGRES_SEEDS=postgres
+      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - qlp-network
+
+  temporal-ui:
+    image: temporalio/ui:2.21.3
+    container_name: qlp-temporal-ui
+    ports:
+      - "8088:8080"
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_CORS_ORIGINS=http://localhost:3000
+    depends_on:
+      - temporal
+    networks:
+      - qlp-network
+
+  # Observability Stack
+  jaeger:
+    image: jaegertracing/all-in-one:1.51
+    container_name: qlp-jaeger
+    ports:
+      - "5775:5775/udp"
+      - "6831:6831/udp"
+      - "6832:6832/udp"
+      - "5778:5778"
+      - "16686:16686"
+      - "14268:14268"
+      - "14250:14250"
+      - "9411:9411"
+    environment:
+      - COLLECTOR_ZIPKIN_HOST_PORT=:9411
+    networks:
+      - qlp-network
+
+  prometheus:
+    image: prom/prometheus:v2.47.2
+    container_name: qlp-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infrastructure/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    networks:
+      - qlp-network
+
+  grafana:
+    image: grafana/grafana:10.2.2
+    container_name: qlp-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./infrastructure/grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
+    networks:
+      - qlp-network
+
+networks:
+  qlp-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  mongodb-data:
+  redis-data:
+  prometheus-data:
+  grafana-data:

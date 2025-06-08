@@ -304,6 +304,11 @@ func initTelemetry(cfg *config.Config, logger *zap.Logger) (func(context.Context
 func startMetricsServer(port string, logger *zap.Logger) {
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, `{"status":"healthy","service":"orchestrator","version":"1.0.0"}`)
+	})
 	
 	server := &http.Server{
 		Addr:    ":" + port,
