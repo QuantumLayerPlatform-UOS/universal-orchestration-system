@@ -61,9 +61,12 @@ services:
       - DB_NAME=orchestrator
       - DB_USER=postgres
       - DB_PASSWORD=postgres123
+      - ORCHESTRATOR_DATABASE_URL=postgres://postgres:postgres123@postgres:5432/orchestrator?sslmode=disable
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_PASSWORD=redis123
+      - ORCHESTRATOR_REDIS_ADDR=redis:6379
+      - ORCHESTRATOR_REDIS_PASSWORD=redis123
       - LOG_LEVEL=debug
     ports:
       - "8080:8080"
@@ -90,6 +93,9 @@ services:
       - REDIS_PASSWORD=redis123
       - AGENT_MANAGER_URL=http://agent-manager:8082
       - ORCHESTRATOR_URL=http://orchestrator:8080
+      - AZURE_OPENAI_API_KEY=dummy-key
+      - AZURE_OPENAI_ENDPOINT=https://dummy.openai.azure.com
+      - AZURE_OPENAI_DEPLOYMENT_NAME=gpt-35-turbo
       - LOG_LEVEL=debug
     ports:
       - "8081:8081"
@@ -108,8 +114,10 @@ services:
       context: ./services/agent-manager
       dockerfile: Dockerfile
     environment:
-      - SERVER_PORT=8082
+      - PORT=8082
+      - NODE_ENV=development
       - MONGO_URI=mongodb://admin:mongo123@mongodb:27017/agent_manager?authSource=admin
+      - MONGODB_URI=mongodb://admin:mongo123@mongodb:27017/agent_manager?authSource=admin
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_PASSWORD=redis123
