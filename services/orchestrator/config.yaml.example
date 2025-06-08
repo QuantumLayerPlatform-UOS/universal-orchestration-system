@@ -1,0 +1,129 @@
+# Orchestrator Service Configuration
+# Copy this file to config.yaml and update with your settings
+
+server:
+  port: "8080"
+  host: "0.0.0.0"
+  read_timeout: 30
+  write_timeout: 30
+  shutdown_timeout: 30
+  max_request_size: 10485760  # 10MB
+  enable_profiling: false
+  enable_metrics: true
+  metrics_port: "9090"
+  graceful_shutdown: true
+
+database:
+  url: "postgres://orchestrator:orchestrator@localhost:5432/orchestrator?sslmode=disable"
+  max_open_conns: 25
+  max_idle_conns: 5
+  conn_max_lifetime: 300
+  conn_max_idle_time: 30
+  enable_auto_migration: true
+  log_level: "warn"
+  slow_threshold: 200
+
+redis:
+  addr: "localhost:6379"
+  password: ""
+  db: 0
+  max_retries: 3
+  min_idle_conns: 5
+  max_active_conns: 100
+  conn_max_lifetime: 300
+  read_timeout: 3
+  write_timeout: 3
+  pool_timeout: 4
+  enable_tls: false
+
+temporal:
+  host_port: "localhost:7233"
+  namespace: "default"
+  task_queue: "orchestrator-task-queue"
+  enable_metrics: true
+  metrics_scope: "orchestrator"
+  max_concurrent_activities: 100
+  max_concurrent_workflows: 100
+  worker_options:
+    max_concurrent_activity_execution_size: 100
+    max_concurrent_workflow_task_execution_size: 100
+    max_concurrent_local_activity_execution_size: 100
+    worker_activities_per_second: 100000.0
+    task_queue_activities_per_second: 100000.0
+    max_task_queue_activities_per_second: 100000.0
+    worker_local_activities_per_second: 100000.0
+    task_queue_local_activities_per_second: 100000.0
+  client_options:
+    connection_timeout: 10
+    rpc_timeout: 10
+    rpc_long_poll_timeout: 60
+    rpc_maximum_attempts: 3
+    enable_keep_alive: true
+    keep_alive_time: 30
+    keep_alive_timeout: 10
+    keep_alive_permit_without_stream: true
+
+intent_api:
+  address: "localhost:50051"
+  timeout: 30
+  max_retries: 3
+  retry_interval: 1
+  enable_tls: false
+  max_connection_idle: 300
+  max_connection_age: 600
+  keep_alive_interval: 30
+  keep_alive_timeout: 10
+
+agent_manager:
+  base_url: "http://localhost:8081"
+  websocket_url: "ws://localhost:8081"
+  http_timeout: 30
+  websocket_timeout: 60
+  max_retries: 3
+  retry_interval: 1
+  ping_interval: 30
+  pong_timeout: 10
+  max_reconnect_attempts: 5
+  reconnect_interval: 5
+  buffer_size: 1024
+  enable_compression: true
+
+telemetry:
+  enabled: true
+  service_name: "orchestrator"
+  service_version: "1.0.0"
+  environment: "development"
+  sampling_rate: 1.0
+  enable_distributed_tracing: true
+  enable_metrics: true
+  enable_logging: true
+  log_level: "info"
+  jaeger:
+    agent_host: "localhost"
+    agent_port: 6831
+    collector_endpoint: "http://localhost:14268/api/traces"
+    use_agent: true
+    buffer_max_count: 100
+    batch_max_count: 100
+  prometheus:
+    push_gateway: ""
+    push_interval: 10
+    metrics_path: "/metrics"
+    enable_go_metrics: true
+    enable_process_metrics: true
+    default_labels:
+      service: "orchestrator"
+      environment: "development"
+
+auth:
+  enabled: false
+  jwt_secret: "your-secret-key-here"
+  jwt_expiration: 3600
+  jwt_refresh_expiration: 86400
+  api_key_header: "X-API-Key"
+  api_keys:
+    - "test-api-key-123"
+  enable_oauth: false
+  oauth_providers:
+    - "github"
+    - "google"

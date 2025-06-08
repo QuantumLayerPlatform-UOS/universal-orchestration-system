@@ -1,0 +1,128 @@
+syntax = "proto3";
+
+package intent.v1;
+
+option go_package = "github.com/quantumlayer/uos/services/orchestrator/internal/proto/intent;intent";
+
+import "google/protobuf/timestamp.proto";
+
+// IntentService provides intent processing capabilities
+service IntentService {
+    // ProcessIntent processes a natural language intent
+    rpc ProcessIntent(ProcessIntentRequest) returns (ProcessIntentResponse);
+    
+    // GetIntentStatus retrieves the status of an intent
+    rpc GetIntentStatus(GetIntentStatusRequest) returns (GetIntentStatusResponse);
+    
+    // CancelIntent cancels a running intent
+    rpc CancelIntent(CancelIntentRequest) returns (CancelIntentResponse);
+    
+    // AnalyzeIntent analyzes an intent without processing it
+    rpc AnalyzeIntent(AnalyzeIntentRequest) returns (AnalyzeIntentResponse);
+}
+
+// Intent represents a user intent
+message Intent {
+    string type = 1;
+    string content = 2;
+    map<string, string> context = 3;
+    map<string, string> parameters = 4;
+    map<string, string> constraints = 5;
+}
+
+// ProcessIntentRequest represents a request to process an intent
+message ProcessIntentRequest {
+    Intent intent = 1;
+    string project_id = 2;
+    string user_id = 3;
+    string request_id = 4;
+    ProcessingOptions options = 5;
+}
+
+// ProcessingOptions contains options for processing
+message ProcessingOptions {
+    bool async = 1;
+    string priority = 2;
+    int32 timeout_seconds = 3;
+    int32 max_retries = 4;
+}
+
+// ProcessIntentResponse represents the response from processing an intent
+message ProcessIntentResponse {
+    string intent_id = 1;
+    string status = 2;
+    string message = 3;
+    map<string, string> result = 4;
+    float confidence = 5;
+    repeated Action actions = 6;
+    repeated string suggestions = 7;
+    map<string, string> metadata = 8;
+}
+
+// Action represents an action to be performed
+message Action {
+    string id = 1;
+    string type = 2;
+    string description = 3;
+    map<string, string> parameters = 4;
+    string status = 5;
+    map<string, string> result = 6;
+}
+
+// GetIntentStatusRequest represents a request to get intent status
+message GetIntentStatusRequest {
+    string intent_id = 1;
+}
+
+// GetIntentStatusResponse represents the intent status response
+message GetIntentStatusResponse {
+    string intent_id = 1;
+    string status = 2;
+    int32 progress = 3;
+    string message = 4;
+    google.protobuf.Timestamp started_at = 5;
+    google.protobuf.Timestamp completed_at = 6;
+    string error = 7;
+}
+
+// CancelIntentRequest represents a request to cancel an intent
+message CancelIntentRequest {
+    string intent_id = 1;
+    string reason = 2;
+}
+
+// CancelIntentResponse represents the response from cancelling an intent
+message CancelIntentResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+// AnalyzeIntentRequest represents a request to analyze an intent
+message AnalyzeIntentRequest {
+    string content = 1;
+    map<string, string> context = 2;
+    string project_id = 3;
+    string user_id = 4;
+}
+
+// AnalyzeIntentResponse represents the response from analyzing an intent
+message AnalyzeIntentResponse {
+    string intent_type = 1;
+    float confidence = 2;
+    repeated Entity entities = 3;
+    repeated string required_params = 4;
+    repeated string optional_params = 5;
+    repeated string suggestions = 6;
+    repeated string risks = 7;
+    int32 estimated_time_seconds = 8;
+    float estimated_cost = 9;
+}
+
+// Entity represents an entity extracted from intent
+message Entity {
+    string type = 1;
+    string value = 2;
+    float confidence = 3;
+    int32 start = 4;
+    int32 end = 5;
+}

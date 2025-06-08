@@ -1,0 +1,189 @@
+version: '3.8'
+
+services:
+  orchestrator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: qlp-orchestrator
+    ports:
+      - "8080:8080"  # API port
+      - "9090:9090"  # Metrics port
+    environment:
+      # Server configuration
+      ORCHESTRATOR_SERVER_PORT: "8080"
+      ORCHESTRATOR_SERVER_HOST: "0.0.0.0"
+      ORCHESTRATOR_SERVER_ENABLE_METRICS: "true"
+      ORCHESTRATOR_SERVER_METRICS_PORT: "9090"
+      
+      # Database configuration
+      ORCHESTRATOR_DATABASE_URL: "postgres://orchestrator:orchestrator@postgres:5432/orchestrator?sslmode=disable"
+      
+      # Redis configuration
+      ORCHESTRATOR_REDIS_ADDR: "redis:6379"
+      
+      # Temporal configuration
+      ORCHESTRATOR_TEMPORAL_HOST_PORT: "temporal:7233"
+      ORCHESTRATOR_TEMPORAL_NAMESPACE: "default"
+      ORCHESTRATOR_TEMPORAL_TASK_QUEUE: "orchestrator-task-queue"
+      
+      # Intent API configuration
+      ORCHESTRATOR_INTENT_API_ADDRESS: "intent-processor:50051"
+      
+      # Agent Manager configuration
+      ORCHESTRATOR_AGENT_MANAGER_BASE_URL: "http://agent-manager:8081"
+      ORCHESTRATOR_AGENT_MANAGER_WEBSOCKET_URL: "ws://agent-manager:8081"
+      
+      # Telemetry configuration
+      ORCHESTRATOR_TELEMETRY_ENABLED: "true"
+      ORCHESTRATOR_TELEMETRY_SERVICE_NAME: "orchestrator"
+      ORCHESTRATOR_TELEMETRY_ENVIRONMENT: "development"
+      ORCHESTRATOR_TELEMETRY_JAEGER_COLLECTOR_ENDPOINT: "http://jaeger:14268/api/traces"
+      
+    depends_on:
+      - postgres
+      - redis
+      - temporal
+    networks:
+      - qlp-network
+    volumes:
+      - ./config:/app/config:ro
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: qlp-postgres
+    environment:
+      POSTGRES_USER: orchestrator
+      POSTGRES_PASSWORD: orchestrator
+      POSTGRES_DB: orchestrator
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - qlp-network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: qlp-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - qlp-network
+    restart: unless-stopped
+
+  temporal:
+    image: temporalio/auto-setup:1.22.4
+    container_name: qlp-temporal
+    ports:
+      - "7233:7233"
+      - "7234:7234"
+      - "7235:7235"
+      - "7239:7239"
+    environment:
+      - DB=postgresql
+      - DB_PORT=5432
+      - POSTGRES_USER=temporal
+      - POSTGRES_PWD=temporal
+      - POSTGRES_SEEDS=temporal-postgres
+      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml
+    depends_on:
+      - temporal-postgres
+    networks:
+      - qlp-network
+    restart: unless-stopped
+
+  temporal-postgres:
+    image: postgres:15-alpine
+    container_name: qlp-temporal-postgres
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal
+      POSTGRES_DB: temporal
+    volumes:
+      - temporal_postgres_data:/var/lib/postgresql/data
+    networks:
+      - qlp-network
+    restart: unless-stopped
+
+  temporal-ui:
+    image: temporalio/ui:2.21.3
+    container_name: qlp-temporal-ui
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_CORS_ORIGINS=http://localhost:3000
+    ports:
+      - "8088:8080"
+    depends_on:
+      - temporal
+    networks:
+      - qlp-network
+    restart: unless-stopped
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.51
+    container_name: qlp-jaeger
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - "5775:5775/udp"
+      - "6831:6831/udp"
+      - "6832:6832/udp"
+      - "5778:5778"
+      - "16686:16686"  # Jaeger UI
+      - "14268:14268"
+      - "14250:14250"
+      - "9411:9411"
+    networks:
+      - qlp-network
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: qlp-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - qlp-network
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:10.2.2
+    container_name: qlp-grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+    networks:
+      - qlp-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  temporal_postgres_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  qlp-network:
+    driver: bridge
