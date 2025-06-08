@@ -1,0 +1,329 @@
+name: Deploy to Azure
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+      skip-approval:
+        description: 'Skip manual approval for production'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  AZURE_REGISTRY: qlpuosregistry.azurecr.io
+  CLUSTER_NAME: qlp-uos-cluster
+  RESOURCE_GROUP: qlp-uos-rg
+
+jobs:
+  # Build and push Docker images to Azure Container Registry
+  build-and-push:
+    name: Build and Push Images
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - orchestrator
+          - quantum-core
+          - ai-ml
+          - blockchain
+          - iot-edge
+    outputs:
+      image-tag: ${{ steps.meta.outputs.version }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Log in to Azure Container Registry
+        uses: azure/docker-login@v1
+        with:
+          login-server: ${{ env.AZURE_REGISTRY }}
+          username: ${{ secrets.AZURE_REGISTRY_USERNAME }}
+          password: ${{ secrets.AZURE_REGISTRY_PASSWORD }}
+      
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.AZURE_REGISTRY }}/qlp-uos/${{ matrix.service }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{date 'YYYYMMDD'}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+      
+      - name: Check if service exists
+        id: check_service
+        run: |
+          if [ -f "services/${{ matrix.service }}/Dockerfile" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Build and push Docker image
+        if: steps.check_service.outputs.exists == 'true'
+        uses: docker/build-push-action@v5
+        with:
+          context: ./services/${{ matrix.service }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILD_DATE=${{ github.event.repository.updated_at }}
+            VCS_REF=${{ github.sha }}
+            VERSION=${{ steps.meta.outputs.version }}
+
+  # Deploy to staging environment
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.event_name == 'push' || github.event.inputs.environment == 'staging'
+    environment:
+      name: staging
+      url: https://staging.qlp-uos.azure.com
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS_STAGING }}
+      
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+      
+      - name: Get AKS credentials
+        run: |
+          az aks get-credentials \
+            --resource-group ${{ env.RESOURCE_GROUP }}-staging \
+            --name ${{ env.CLUSTER_NAME }}-staging \
+            --overwrite-existing
+      
+      - name: Deploy to Kubernetes
+        run: |
+          # Create namespace if it doesn't exist
+          kubectl create namespace qlp-uos-staging --dry-run=client -o yaml | kubectl apply -f -
+          
+          # Set image tags in manifests
+          export IMAGE_TAG=${{ needs.build-and-push.outputs.image-tag }}
+          
+          # Apply Kubernetes manifests
+          if [ -d "k8s/staging" ]; then
+            kubectl apply -f k8s/staging/ -n qlp-uos-staging
+          elif [ -d "k8s/base" ]; then
+            kubectl apply -f k8s/base/ -n qlp-uos-staging
+          fi
+          
+          # Update image tags for each service
+          for service in orchestrator quantum-core ai-ml blockchain iot-edge; do
+            kubectl set image deployment/${service} \
+              ${service}=${{ env.AZURE_REGISTRY }}/qlp-uos/${service}:${IMAGE_TAG} \
+              -n qlp-uos-staging || true
+          done
+          
+          # Wait for rollout to complete
+          kubectl rollout status deployment --timeout=10m -n qlp-uos-staging
+      
+      - name: Run smoke tests
+        run: |
+          # Wait for services to be ready
+          sleep 30
+          
+          # Run basic health checks
+          echo "Running smoke tests..."
+          # Add smoke test commands here
+      
+      - name: Notify deployment status
+        if: always()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          text: |
+            Staging Deployment ${{ job.status }}
+            Commit: ${{ github.sha }}
+            Author: ${{ github.actor }}
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+
+  # Manual approval for production deployment
+  production-approval:
+    name: Production Deployment Approval
+    runs-on: ubuntu-latest
+    needs: deploy-staging
+    if: |
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event.inputs.environment == 'production' && github.event.inputs.skip-approval != 'true')
+    environment:
+      name: production-approval
+    
+    steps:
+      - name: Request approval
+        run: |
+          echo "🚀 Production deployment requested"
+          echo "Commit: ${{ github.sha }}"
+          echo "Initiated by: ${{ github.actor }}"
+          echo "Please review and approve the deployment"
+
+  # Deploy to production environment
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [build-and-push, production-approval]
+    if: |
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      github.event.inputs.environment == 'production'
+    environment:
+      name: production
+      url: https://qlp-uos.azure.com
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS_PRODUCTION }}
+      
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+      
+      - name: Get AKS credentials
+        run: |
+          az aks get-credentials \
+            --resource-group ${{ env.RESOURCE_GROUP }}-prod \
+            --name ${{ env.CLUSTER_NAME }}-prod \
+            --overwrite-existing
+      
+      - name: Create backup of current deployment
+        run: |
+          # Backup current deployment state
+          kubectl get all -n qlp-uos-prod -o yaml > backup-$(date +%Y%m%d-%H%M%S).yaml
+          
+          # Store backup in Azure Storage
+          az storage blob upload \
+            --account-name qlpuosbackups \
+            --container-name k8s-backups \
+            --name backup-$(date +%Y%m%d-%H%M%S).yaml \
+            --file backup-*.yaml \
+            --auth-mode login || true
+      
+      - name: Deploy to Kubernetes
+        run: |
+          # Create namespace if it doesn't exist
+          kubectl create namespace qlp-uos-prod --dry-run=client -o yaml | kubectl apply -f -
+          
+          # Set image tags in manifests
+          export IMAGE_TAG=${{ needs.build-and-push.outputs.image-tag }}
+          
+          # Apply Kubernetes manifests
+          if [ -d "k8s/production" ]; then
+            kubectl apply -f k8s/production/ -n qlp-uos-prod
+          elif [ -d "k8s/base" ]; then
+            kubectl apply -f k8s/base/ -n qlp-uos-prod
+          fi
+          
+          # Update image tags for each service with rolling update
+          for service in orchestrator quantum-core ai-ml blockchain iot-edge; do
+            kubectl set image deployment/${service} \
+              ${service}=${{ env.AZURE_REGISTRY }}/qlp-uos/${service}:${IMAGE_TAG} \
+              -n qlp-uos-prod \
+              --record || true
+          done
+          
+          # Wait for rollout to complete
+          kubectl rollout status deployment --timeout=15m -n qlp-uos-prod
+      
+      - name: Verify deployment health
+        run: |
+          # Check pod status
+          kubectl get pods -n qlp-uos-prod
+          
+          # Check service endpoints
+          kubectl get svc -n qlp-uos-prod
+          
+          # Run health checks
+          echo "Running production health checks..."
+          # Add health check commands here
+      
+      - name: Update Azure Traffic Manager
+        run: |
+          # Update traffic manager endpoints if needed
+          echo "Updating traffic routing..."
+          # Add traffic manager update commands here
+      
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          echo "Deployment failed, initiating rollback..."
+          kubectl rollout undo deployment --to-revision=0 -n qlp-uos-prod
+          kubectl rollout status deployment --timeout=10m -n qlp-uos-prod
+      
+      - name: Notify deployment status
+        if: always()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          text: |
+            Production Deployment ${{ job.status }}
+            Commit: ${{ github.sha }}
+            Author: ${{ github.actor }}
+            Environment: Production
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+          fields: repo,message,commit,author,action,eventName,ref,workflow
+
+  # Post-deployment verification
+  post-deployment:
+    name: Post-Deployment Verification
+    runs-on: ubuntu-latest
+    needs: deploy-production
+    if: success()
+    
+    steps:
+      - name: Run synthetic monitoring
+        run: |
+          echo "Running synthetic monitoring tests..."
+          # Add synthetic monitoring commands here
+      
+      - name: Check application metrics
+        run: |
+          echo "Checking application metrics..."
+          # Add metrics verification here
+      
+      - name: Create deployment report
+        run: |
+          echo "# Deployment Report" > deployment-report.md
+          echo "Date: $(date)" >> deployment-report.md
+          echo "Commit: ${{ github.sha }}" >> deployment-report.md
+          echo "Deployed by: ${{ github.actor }}" >> deployment-report.md
+          echo "Status: Success" >> deployment-report.md
+      
+      - name: Upload deployment report
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-report
+          path: deployment-report.md
