@@ -49,6 +49,21 @@ services:
       timeout: 5s
       retries: 5
 
+  # Temporal Server for workflow orchestration
+  temporal:
+    image: temporalio/auto-setup:1.22.4
+    environment:
+      - DB=postgresql
+      - DB_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PWD=postgres123
+      - POSTGRES_SEEDS=postgres
+    ports:
+      - "7233:7233"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   # Orchestrator Service
   orchestrator:
     build:
@@ -68,6 +83,8 @@ services:
       - ORCHESTRATOR_REDIS_ADDR=redis:6379
       - ORCHESTRATOR_REDIS_PASSWORD=redis123
       - LOG_LEVEL=debug
+      - ORCHESTRATOR_TELEMETRY_ENABLED=false
+      - ORCHESTRATOR_TEMPORAL_HOST_PORT=temporal:7233
     ports:
       - "8080:8080"
     depends_on:
@@ -75,6 +92,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      temporal:
+        condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 10s
@@ -121,7 +140,11 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_PASSWORD=redis123
+      - REDIS_URL=redis://:redis123@redis:6379
       - LOG_LEVEL=debug
+      - AZURE_TENANT_ID=dummy-tenant-id
+      - AZURE_CLIENT_ID=dummy-client-id
+      - AZURE_CLIENT_SECRET=dummy-client-secret
     ports:
       - "8082:8082"
     depends_on:

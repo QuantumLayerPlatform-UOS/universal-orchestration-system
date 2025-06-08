@@ -242,6 +242,7 @@ func setDefaults() {
 
 	// Redis defaults
 	viper.SetDefault("redis.addr", "localhost:6379")
+	viper.SetDefault("redis.password", "")
 	viper.SetDefault("redis.db", 0)
 	viper.SetDefault("redis.max_retries", 3)
 	viper.SetDefault("redis.min_idle_conns", 5)
