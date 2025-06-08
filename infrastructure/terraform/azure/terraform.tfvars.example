@@ -1,0 +1,8 @@
+# Azure development environment variables
+environment = "dev"
+location    = "UK South"
+
+# These will be prompted for or set via environment variables
+# sql_admin_password = "set_via_env_var"
+# openai_api_key = "set_via_env_var" 
+# mongodb_connection_string = "set_via_env_var"
