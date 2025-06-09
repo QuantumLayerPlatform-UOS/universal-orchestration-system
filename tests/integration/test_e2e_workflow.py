@@ -110,13 +110,18 @@ def test_agent_registration():
     
     return len(agents) > 0
 
-def test_workflow_execution():
+def test_workflow_execution(project_id=None):
     """Test executing a complete workflow"""
     print("\n4. Testing Workflow Execution...")
     
+    # Use provided project_id or a dummy UUID
+    if not project_id:
+        import uuid
+        project_id = str(uuid.uuid4())
+    
     workflow_data = {
         "name": "Generate User Management API",
-        "project_id": "test-project-001",
+        "project_id": project_id,
         "type": "code_generation",
         "input": {
             "requirements": "Create a REST API for user management",
@@ -182,7 +187,7 @@ def main():
     
     # Test 4: Workflow Execution
     tests_total += 1
-    if test_workflow_execution():
+    if test_workflow_execution(project_id):
         tests_passed += 1
     
     # Summary

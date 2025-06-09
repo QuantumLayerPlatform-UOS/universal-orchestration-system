@@ -32,12 +32,16 @@ func (s *ProjectService) CreateProject(ctx context.Context, req *CreateProjectRe
 		Description:    req.Description,
 		Type:           models.ProjectType(req.Type),
 		OwnerID:        req.OwnerID,
-		OrganizationID: req.OrganizationID,
 		Settings:       req.Settings,
 		Tags:           req.Tags,
 		Status:         models.ProjectStatusActive,
 		CreatedBy:      req.OwnerID,
 		UpdatedBy:      req.OwnerID,
+	}
+	
+	// Only set OrganizationID if it's not empty
+	if req.OrganizationID != "" {
+		project.OrganizationID = &req.OrganizationID
 	}
 
 	// Set defaults

@@ -36,7 +36,7 @@ type Project struct {
 	Description      string          `json:"description"`
 	Type             ProjectType     `gorm:"not null;default:'standard'" json:"type"`
 	Status           ProjectStatus   `gorm:"not null;default:'active';index" json:"status"`
-	OrganizationID   string          `gorm:"type:uuid;index" json:"organization_id"`
+	OrganizationID   *string         `gorm:"type:uuid;index" json:"organization_id,omitempty"`
 	OwnerID          string          `gorm:"not null;index" json:"owner_id"`
 	Tags             []string        `gorm:"type:text[]" json:"tags,omitempty"`
 	Metadata         json.RawMessage `gorm:"type:jsonb" json:"metadata,omitempty"`
