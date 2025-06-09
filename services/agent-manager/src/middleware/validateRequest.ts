@@ -78,6 +78,7 @@ export const schemas = {
 
   // Agent registration
   agentRegistration: Joi.object({
+    id: Joi.string().optional(),
     name: Joi.string().min(3).max(100).required(),
     type: Joi.string().valid(
       'code-gen', 'test-gen', 'deploy', 'monitor', 
@@ -86,6 +87,7 @@ export const schemas = {
     capabilities: Joi.array().items(
       Joi.object({
         name: Joi.string().required(),
+        description: Joi.string().optional(),
         version: Joi.string().required(),
         parameters: Joi.object()
       })

@@ -167,11 +167,17 @@ class AgentManagerServer {
       next();
     });
 
-    agentNamespace.on('connection', (socket) => {
+    agentNamespace.on('connection', async (socket) => {
       logger.info(`Agent connected: ${socket.data.agentId}`);
       
       // Initialize agent communication handlers
-      this.agentCommunicator.handleAgentConnection(socket);
+      try {
+        await this.agentCommunicator.handleAgentConnection(socket);
+      } catch (error) {
+        logger.error(`Failed to handle agent connection: ${error}`);
+        socket.disconnect();
+        return;
+      }
 
       socket.on('disconnect', (reason) => {
         logger.info(`Agent disconnected: ${socket.data.agentId}, reason: ${reason}`);

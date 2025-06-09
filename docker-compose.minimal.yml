@@ -153,10 +153,25 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8082/health"]
       interval: 10s
       timeout: 5s
       retries: 5
+
+  # Code Generation Agent
+  code-gen-agent:
+    build:
+      context: ./services/agents/code-gen-agent
+      dockerfile: Dockerfile
+    environment:
+      - NODE_ENV=production
+      - AGENT_MANAGER_URL=http://agent-manager:8082
+      - AGENT_ID=code-gen-agent-001
+      - LOG_LEVEL=info
+    depends_on:
+      agent-manager:
+        condition: service_healthy
+    restart: unless-stopped
 
 volumes:
   postgres_data:

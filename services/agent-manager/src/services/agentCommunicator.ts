@@ -42,7 +42,7 @@ export class AgentCommunicator extends EventEmitter {
     });
   }
 
-  public handleAgentConnection(socket: Socket): void {
+  public async handleAgentConnection(socket: Socket): Promise<void> {
     const agentId = socket.data.agentId;
     
     if (!agentId) {
@@ -55,7 +55,13 @@ export class AgentCommunicator extends EventEmitter {
     this.agentSockets.set(agentId, socket);
 
     // Update agent status
-    this.agentRegistry.updateAgentStatus(agentId, AgentStatus.AVAILABLE);
+    try {
+      await this.agentRegistry.updateAgentStatus(agentId, AgentStatus.AVAILABLE);
+    } catch (error) {
+      logger.error(`Failed to update agent status for ${agentId}:`, error);
+      socket.disconnect();
+      return;
+    }
 
     // Setup event handlers
     this.setupAgentEventHandlers(socket, agentId);

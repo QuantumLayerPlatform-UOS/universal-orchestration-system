@@ -40,11 +40,11 @@ ENV PYTHONDONTWRITEBYTECODE=1
 USER appuser
 
 # Expose port
-EXPOSE 8001
+EXPOSE 8081
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8001/health')"
+    CMD python -c "import requests; requests.get('http://localhost:8081/health')"
 
 # Run the application
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8001"]
+CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8081"]

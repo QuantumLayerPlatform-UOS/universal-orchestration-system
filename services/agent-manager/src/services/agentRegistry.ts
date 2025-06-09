@@ -65,7 +65,8 @@ export class AgentRegistry extends EventEmitter {
   }
 
   public async registerAgent(request: AgentRegistrationRequest, socketId?: string): Promise<Agent> {
-    const agentId = uuidv4();
+    // Use provided ID if available, otherwise generate one
+    const agentId = request.id || uuidv4();
     const now = new Date();
 
     const agent: Agent = {

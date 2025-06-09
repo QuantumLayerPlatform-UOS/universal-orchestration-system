@@ -38,6 +38,7 @@ export enum TaskPriority {
 
 export interface AgentCapability {
   name: string;
+  description?: string;
   version: string;
   parameters?: Record<string, any>;
 }
@@ -157,6 +158,7 @@ export interface AgentHealthCheck {
 }
 
 export interface AgentRegistrationRequest {
+  id?: string;
   name: string;
   type: AgentType;
   capabilities: AgentCapability[];
