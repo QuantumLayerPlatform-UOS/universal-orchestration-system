@@ -78,6 +78,11 @@ export class MongoDBService {
     return this.db.collection<T>(name);
   }
 
+  public setDb(db: Db): void {
+    this.db = db;
+    logger.info('Database set externally');
+  }
+
   public async disconnect(): Promise<void> {
     if (this.client) {
       await this.client.close();

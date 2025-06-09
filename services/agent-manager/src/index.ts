@@ -212,6 +212,10 @@ class AgentManagerServer {
       await this.mongoService.connect();
       logger.info('Connected to MongoDB');
 
+      // Initialize agent registry
+      await this.agentRegistry.initialize();
+      logger.info('Agent registry initialized');
+
       // Initialize task queue
       await this.taskQueue.initialize();
       logger.info('Task queue initialized');

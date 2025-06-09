@@ -181,7 +181,7 @@ export interface AgentRegistrationRequest {
 
 export interface TaskRequest {
   type: AgentType;
-  priority?: TaskPriority;
+  priority?: string | TaskPriority;
   payload: Record<string, any>;
   requiredCapabilities?: string[];
   metadata?: {

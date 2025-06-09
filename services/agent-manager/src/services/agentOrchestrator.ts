@@ -186,11 +186,28 @@ export class AgentOrchestrator extends EventEmitter {
     }
   }
 
+  private mapPriorityToNumber(priority?: string): TaskPriority {
+    switch (priority?.toLowerCase()) {
+      case 'critical':
+        return TaskPriority.CRITICAL;
+      case 'high':
+        return TaskPriority.HIGH;
+      case 'medium':
+        return TaskPriority.MEDIUM;
+      case 'low':
+        return TaskPriority.LOW;
+      default:
+        return TaskPriority.MEDIUM;
+    }
+  }
+
   public async submitTask(request: TaskRequest): Promise<Task> {
     const task: Task = {
       id: uuidv4(),
       type: request.type,
-      priority: request.priority || TaskPriority.MEDIUM,
+      priority: typeof request.priority === 'string' 
+        ? this.mapPriorityToNumber(request.priority) 
+        : (request.priority ?? TaskPriority.MEDIUM),
       status: TaskStatus.PENDING,
       payload: request.payload,
       requiredCapabilities: request.requiredCapabilities,

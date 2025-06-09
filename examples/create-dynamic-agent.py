@@ -52,7 +52,8 @@ def create_code_review_agent():
         print(f"❌ Failed to create design task: {resp.text}")
         return
     
-    task_id = resp.json().get('taskId')
+    resp_data = resp.json()
+    task_id = resp_data.get('taskId') or resp_data.get('task', {}).get('id')
     print(f"✅ Design task created: {task_id}")
     
     # Wait for design completion
@@ -102,7 +103,8 @@ def create_code_review_agent():
     }
     
     resp = requests.post(f"{AGENT_MANAGER_URL}/api/v1/tasks", json=spawn_request)
-    task_id = resp.json().get('taskId')
+    resp_data = resp.json()
+    task_id = resp_data.get('taskId') or resp_data.get('task', {}).get('id')
     
     print("⏳ Spawning agent...")
     agent_id = None
@@ -160,7 +162,8 @@ print(f"Total: ${total}")
     }
     
     resp = requests.post(f"{AGENT_MANAGER_URL}/api/v1/tasks", json=review_request)
-    task_id = resp.json().get('taskId')
+    resp_data = resp.json()
+    task_id = resp_data.get('taskId') or resp_data.get('task', {}).get('id')
     
     print("⏳ Agent is reviewing code...")
     

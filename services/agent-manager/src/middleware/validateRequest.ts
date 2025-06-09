@@ -82,7 +82,8 @@ export const schemas = {
     name: Joi.string().min(3).max(100).required(),
     type: Joi.string().valid(
       'code-gen', 'test-gen', 'deploy', 'monitor', 
-      'security', 'documentation', 'review', 'optimization'
+      'security', 'documentation', 'review', 'optimization',
+      'meta-prompt', 'dynamic'
     ).required(),
     capabilities: Joi.array().items(
       Joi.object({
@@ -92,7 +93,7 @@ export const schemas = {
         parameters: Joi.object()
       })
     ).min(1).required(),
-    endpoint: Joi.string().uri(),
+    endpoint: Joi.string().uri().optional(),
     metadata: Joi.object({
       version: Joi.string().required(),
       platform: Joi.string().required(),
@@ -105,9 +106,10 @@ export const schemas = {
   taskSubmission: Joi.object({
     type: Joi.string().valid(
       'code-gen', 'test-gen', 'deploy', 'monitor', 
-      'security', 'documentation', 'review', 'optimization'
+      'security', 'documentation', 'review', 'optimization',
+      'meta-prompt', 'dynamic'
     ).required(),
-    priority: Joi.number().valid(0, 1, 2, 3),
+    priority: Joi.string().valid('critical', 'high', 'medium', 'low').optional(),
     payload: Joi.object().required(),
     requiredCapabilities: Joi.array().items(Joi.string()),
     metadata: Joi.object({

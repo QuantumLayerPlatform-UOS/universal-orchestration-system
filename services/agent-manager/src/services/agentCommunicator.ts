@@ -51,34 +51,88 @@ export class AgentCommunicator extends EventEmitter {
       return;
     }
 
+    logger.info(`Handling connection for agent ${agentId}`);
+
     // Store socket reference
     this.agentSockets.set(agentId, socket);
 
-    // Update agent status
-    try {
-      await this.agentRegistry.updateAgentStatus(agentId, AgentStatus.AVAILABLE);
-    } catch (error) {
-      logger.error(`Failed to update agent status for ${agentId}:`, error);
-      socket.disconnect();
-      return;
-    }
-
-    // Setup event handlers
-    this.setupAgentEventHandlers(socket, agentId);
-
-    // Send welcome message
-    this.sendMessage(agentId, {
-      id: uuidv4(),
-      from: 'orchestrator',
-      to: agentId,
-      type: 'event',
-      topic: 'welcome',
-      payload: {
-        message: 'Connected to Agent Manager',
-        timestamp: new Date()
-      },
-      timestamp: new Date()
+    // Set up a promise to handle agent registration/verification
+    const agentVerificationPromise = new Promise<void>(async (resolve, reject) => {
+      try {
+        // First, try to get the agent from registry
+        const existingAgent = await this.agentRegistry.getAgent(agentId);
+        
+        if (existingAgent) {
+          // Agent exists, update status
+          logger.info(`Agent ${agentId} found in registry, updating status`);
+          await this.agentRegistry.updateAgentStatus(agentId, AgentStatus.AVAILABLE);
+          resolve();
+        } else {
+          // Agent not found, wait for agent:info event
+          logger.info(`Agent ${agentId} not found in registry, waiting for agent:info event`);
+          
+          // Set up one-time listener for agent:info
+          const infoHandler = async (agentInfo: any) => {
+            try {
+              logger.info(`Received agent:info for ${agentId}`, agentInfo);
+              
+              // Validate agent info
+              if (!agentInfo || !agentInfo.name || !agentInfo.type || !agentInfo.capabilities) {
+                throw new Error('Invalid agent info received');
+              }
+              
+              // Register the agent
+              await this.agentRegistry.registerAgent(agentInfo, socket.id);
+              logger.info(`Agent ${agentId} registered successfully`);
+              
+              resolve();
+            } catch (error) {
+              logger.error(`Failed to register agent ${agentId}:`, error);
+              reject(error);
+            }
+          };
+          
+          socket.once('agent:info', infoHandler);
+          
+          // Request agent info
+          socket.emit('agent:info:request', { timestamp: new Date() });
+          
+          // Set timeout for agent info
+          setTimeout(() => {
+            socket.off('agent:info', infoHandler);
+            reject(new Error(`Timeout waiting for agent:info from ${agentId}`));
+          }, 10000); // 10 second timeout
+        }
+      } catch (error) {
+        reject(error);
+      }
     });
+
+    try {
+      // Wait for agent verification
+      await agentVerificationPromise;
+      
+      // Setup event handlers
+      this.setupAgentEventHandlers(socket, agentId);
+
+      // Send welcome message
+      this.sendMessage(agentId, {
+        id: uuidv4(),
+        from: 'orchestrator',
+        to: agentId,
+        type: 'event',
+        topic: 'welcome',
+        payload: {
+          message: 'Connected to Agent Manager',
+          timestamp: new Date()
+        },
+        timestamp: new Date()
+      });
+    } catch (error) {
+      logger.error(`Failed to verify agent ${agentId}:`, error);
+      this.agentSockets.delete(agentId);
+      socket.disconnect();
+    }
   }
 
   public handleAgentDisconnection(socket: Socket): void {
@@ -104,6 +158,21 @@ export class AgentCommunicator extends EventEmitter {
   }
 
   private setupAgentEventHandlers(socket: Socket, agentId: string): void {
+    // Agent info (for auto-registration)
+    socket.on('agent:info', async (agentInfo: any) => {
+      logger.info(`Received agent info from ${agentId}`, agentInfo);
+      try {
+        // Try to register the agent if not already registered
+        const existingAgent = await this.agentRegistry.getAgent(agentId);
+        if (!existingAgent) {
+          logger.info(`Auto-registering agent ${agentId}`);
+          await this.agentRegistry.registerAgent(agentInfo, socket.id);
+        }
+      } catch (error) {
+        logger.debug(`Agent ${agentId} auto-registration check:`, error);
+      }
+    });
+
     // Heartbeat
     socket.on('heartbeat', async () => {
       await this.agentRegistry.updateAgentHeartbeat(agentId);

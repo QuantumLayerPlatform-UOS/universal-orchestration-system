@@ -145,9 +145,7 @@ services:
 
   # Agent Manager Service
   agent-manager:
-    build:
-      context: ./services/agent-manager
-      dockerfile: Dockerfile
+    image: qlp-uos-agent-manager:latest
     environment:
       - PORT=8082
       - NODE_ENV=development
@@ -191,9 +189,7 @@ services:
 
   # Meta-Prompt Orchestrator for Dynamic Agents
   meta-prompt-agent:
-    build:
-      context: ./services/agents/meta-prompt-agent
-      dockerfile: Dockerfile
+    image: meta-prompt-agent:latest
     environment:
       - NODE_ENV=production
       - META_AGENT_ID=meta-prompt-orchestrator

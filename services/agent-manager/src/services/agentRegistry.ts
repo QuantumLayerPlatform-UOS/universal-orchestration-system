@@ -16,7 +16,10 @@ export class AgentRegistry extends EventEmitter {
     super();
     this.mongoService = mongoService;
     this.initializeHeartbeatMonitor();
-    this.loadAgentsFromDatabase();
+  }
+
+  public async initialize(): Promise<void> {
+    await this.loadAgentsFromDatabase();
   }
 
   private async loadAgentsFromDatabase(): Promise<void> {
@@ -141,9 +144,20 @@ export class AgentRegistry extends EventEmitter {
   }
 
   public async updateAgentStatus(agentId: string, status: AgentStatus): Promise<void> {
-    const agent = this.agents.get(agentId);
+    let agent = this.agents.get(agentId);
+    
     if (!agent) {
-      throw new Error(`Agent ${agentId} not found`);
+      // Try to load from database
+      const collection = this.mongoService.getCollection<Agent>('agents');
+      const dbAgent = await collection.findOne({ id: agentId });
+      
+      if (dbAgent) {
+        logger.info(`Loading agent ${agentId} from database into registry`);
+        this.agents.set(agentId, dbAgent);
+        agent = dbAgent;
+      } else {
+        throw new Error(`Agent ${agentId} not found`);
+      }
     }
 
     agent.status = status;
@@ -157,9 +171,20 @@ export class AgentRegistry extends EventEmitter {
   }
 
   public async updateAgentHeartbeat(agentId: string): Promise<void> {
-    const agent = this.agents.get(agentId);
+    let agent = this.agents.get(agentId);
+    
     if (!agent) {
-      throw new Error(`Agent ${agentId} not found`);
+      // Try to load from database
+      const collection = this.mongoService.getCollection<Agent>('agents');
+      const dbAgent = await collection.findOne({ id: agentId });
+      
+      if (dbAgent) {
+        logger.info(`Loading agent ${agentId} from database for heartbeat`);
+        this.agents.set(agentId, dbAgent);
+        agent = dbAgent;
+      } else {
+        throw new Error(`Agent ${agentId} not found`);
+      }
     }
 
     const now = new Date();
