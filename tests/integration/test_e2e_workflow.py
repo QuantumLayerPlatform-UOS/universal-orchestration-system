@@ -52,8 +52,9 @@ def test_project_creation():
     """Test creating a new project via orchestrator"""
     print("\n1. Testing Project Creation...")
     
+    import time
     project_data = {
-        "name": "Test E2E Project",
+        "name": f"Test E2E Project {int(time.time())}",
         "description": "Testing end-to-end workflow",
         "type": "standard"
     }
@@ -131,12 +132,12 @@ def test_workflow_execution(project_id=None):
     }
     
     resp = requests.post(f"{ORCHESTRATOR_URL}/api/v1/workflows", json=workflow_data)
-    if resp.status_code != 200:
+    if resp.status_code not in [200, 201]:
         print(f"  ✗ Failed to start workflow: {resp.text}")
         return None
     
     workflow = resp.json()
-    workflow_id = workflow['data']['id']
+    workflow_id = workflow['data'].get('workflow_id') or workflow['data'].get('id')
     print(f"  ✓ Workflow started: {workflow_id}")
     
     # Poll for workflow completion
