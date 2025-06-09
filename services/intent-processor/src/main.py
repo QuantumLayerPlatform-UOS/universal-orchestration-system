@@ -25,6 +25,7 @@ from .models import (
 )
 from .services.intent_analyzer import IntentAnalyzer
 from .services.mock_intent_analyzer import MockIntentAnalyzer
+from .services.real_intent_analyzer import RealIntentAnalyzer
 from .services.prompt_manager import PromptManager
 from .utils.resilience import (
     retry_with_backoff,
@@ -83,8 +84,22 @@ async def lifespan(app: FastAPI):
         azure_key = os.getenv("AZURE_OPENAI_API_KEY", "")
         azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "")
         
-        if azure_key and azure_endpoint and azure_key != "dummy-key":
-            # Use real intent analyzer
+        # Check for real LLM providers first
+        use_real_llm = any([
+            os.getenv("OLLAMA_BASE_URL"),
+            os.getenv("GROQ_API_KEY"),
+            os.getenv("OPENAI_API_KEY"),
+            os.getenv("ANTHROPIC_API_KEY")
+        ])
+        
+        if use_real_llm:
+            # Use real LLM analyzer
+            app.state.prompt_manager = PromptManager()
+            app.state.intent_analyzer = RealIntentAnalyzer()
+            await app.state.intent_analyzer.initialize()
+            logger.info("Services initialized with real LLM provider")
+        elif azure_key and azure_endpoint and azure_key != "dummy-key":
+            # Use Azure OpenAI analyzer
             app.state.prompt_manager = PromptManager()
             app.state.intent_analyzer = IntentAnalyzer(app.state.prompt_manager)
             await app.state.intent_analyzer.initialize()
@@ -94,7 +109,7 @@ async def lifespan(app: FastAPI):
             app.state.prompt_manager = PromptManager()  # Initialize prompt manager even for mock
             app.state.intent_analyzer = MockIntentAnalyzer()
             await app.state.intent_analyzer.initialize()
-            logger.warning("Using mock intent analyzer (no Azure OpenAI credentials)")
+            logger.warning("Using mock intent analyzer (no LLM credentials)")
         
         # Register health checks
         app.state.health_checker.register_check(

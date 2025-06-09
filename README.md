@@ -2,6 +2,36 @@
 
 > **Democratizing software development through AI orchestration - from intent to production in minutes, not months.**
 
+<!-- STATUS_START -->
+## 📊 System Status
+
+> Last Updated: 2025-06-09 12:58:56
+
+### 🏃 Service Health
+| Service | Status | Description |
+|---------|--------|-------------|
+| Orchestrator | ❌ | Workflow orchestration service |
+| Agent Manager | ❌ | Agent lifecycle management |
+| Intent Processor | ❌ | Natural language processing |
+
+### 📈 Code Quality
+- **TODOs in Codebase**: 414
+- **Test Coverage**: Pending Implementation
+- **Security Vulnerabilities**: Check [Security Tab](../../security)
+
+### 🚀 Quick Start
+```bash
+# Start all services
+make up
+
+# Check health
+make health
+
+# Run demo
+make demo
+```
+<!-- STATUS_END -->
+
 ## 🚀 Project Overview
 
 The Universal Orchestration System (UOS) is an AI-powered platform that transforms natural language requirements into production-ready software solutions through intelligent agent coordination and automated deployment.

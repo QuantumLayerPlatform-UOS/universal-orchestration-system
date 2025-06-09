@@ -1,10 +1,24 @@
 # QuantumLayer Platform Makefile
+# Always Demo-Ready Commands
+
+# Colors for output
+GREEN  := \033[0;32m
+YELLOW := \033[0;33m
+RED    := \033[0;31m
+NC     := \033[0m # No Color
 
 .PHONY: help
 help: ## Display this help message
-	@echo "QuantumLayer Platform Development Commands:"
+	@echo "$(GREEN)QuantumLayer Platform - Universal Orchestration System$(NC)"
+	@echo "$(YELLOW)Always Demo-Ready Commands:$(NC)"
 	@echo ""
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(GREEN)%-30s$(NC) %s\n", $$1, $$2}'
+	@echo ""
+	@echo "$(YELLOW)Quick Start:$(NC) make up && make demo"
+
+# Quick Commands for Demo
+.PHONY: quick
+quick: up demo ## Quick demo (start services and run demo)
 
 # Development Stack Commands
 .PHONY: dev-up
@@ -206,3 +220,60 @@ setup: ## Initial setup for development
 	@make infra-init
 	@make dev-up
 	@echo "Setup complete!"
+
+# Demo Commands
+.PHONY: demo
+demo: ## Run interactive demo (always ready!)
+	@echo "$(GREEN)🎭 Starting Interactive Demo$(NC)"
+	@echo ""
+	@echo "Choose a demo scenario:"
+	@echo "  1) Create REST API from description"
+	@echo "  2) Fix a bug with AI assistance"
+	@echo "  3) Generate test suite"
+	@echo "  4) Full workflow demonstration"
+	@echo ""
+	@read -p "Enter choice (1-4): " choice; \
+	case $$choice in \
+		1) make demo-api ;; \
+		2) make demo-bugfix ;; \
+		3) make demo-tests ;; \
+		4) make demo-full ;; \
+		*) echo "Invalid choice" ;; \
+	esac
+
+.PHONY: demo-api
+demo-api: ## Demo: Create REST API
+	@echo "$(YELLOW)Demo: Creating REST API from natural language$(NC)"
+	@curl -X POST http://localhost:8081/api/v1/process-intent \
+		-H "Content-Type: application/json" \
+		-d '{"text": "Create a REST API for user management with CRUD operations", "request_id": "demo-001"}' \
+		| jq '.'
+
+.PHONY: up
+up: ## Start minimal services for demo
+	@echo "$(YELLOW)Starting services for demo...$(NC)"
+	@docker-compose -f docker-compose.minimal.yml up -d
+	@echo "$(GREEN)✅ Services started! Waiting for health checks...$(NC)"
+	@sleep 15
+	@make health
+
+.PHONY: down
+down: ## Stop all services
+	@echo "$(YELLOW)Stopping all services...$(NC)"
+	@docker-compose -f docker-compose.minimal.yml down
+	@echo "$(GREEN)✅ Services stopped!$(NC)"
+
+.PHONY: health
+health: ## Check health of all services (pretty output)
+	@echo "$(YELLOW)Checking service health...$(NC)"
+	@echo ""
+	@echo "🏥 $(GREEN)Health Status:$(NC)"
+	@echo "├── Orchestrator:      $$(curl -s http://localhost:8080/health | jq -r '.success' | sed 's/true/✅/;s/false/❌/' 2>/dev/null || echo '❌')"
+	@echo "├── Agent Manager:     $$(curl -s http://localhost:8082/health | jq -r '.status' | sed 's/healthy/✅/;s/unhealthy/❌/' 2>/dev/null || echo '❌')"
+	@echo "├── Intent Processor:  $$(curl -s http://localhost:8081/health | jq -r '.status' | sed 's/healthy/✅/;s/unhealthy/❌/' 2>/dev/null || echo '❌')"
+	@echo "└── Registered Agents: $$(curl -s http://localhost:8082/api/v1/agents | jq '.count' 2>/dev/null || echo '0')"
+	@echo ""
+
+.PHONY: update-status
+update-status: ## Update README with current status
+	@python scripts/update-readme-status.py

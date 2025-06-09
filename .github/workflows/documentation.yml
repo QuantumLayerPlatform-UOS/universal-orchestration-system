@@ -1,0 +1,70 @@
+name: Generate Documentation
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  generate-docs:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    
+    - name: Install documentation tools
+      run: |
+        pip install mkdocs mkdocs-material mkdocs-mermaid2-plugin
+        pip install pydoc-markdown
+        npm install -g @compodoc/compodoc
+        go install github.com/princjef/gomarkdoc/cmd/gomarkdoc@latest
+    
+    - name: Generate API documentation
+      run: |
+        # Generate Python docs for Intent Processor
+        cd services/intent-processor
+        pydoc-markdown -p src > ../../docs/api/intent-processor.md
+        
+        # Generate Go docs for Orchestrator
+        cd ../orchestrator
+        ~/go/bin/gomarkdoc ./... > ../../docs/api/orchestrator.md
+        
+        # Generate TypeScript docs for Agent Manager
+        cd ../agent-manager
+        npx compodoc -p tsconfig.json -d ../../docs/api/agent-manager
+    
+    - name: Generate architecture diagrams
+      run: |
+        python scripts/generate-architecture-diagrams.py
+    
+    - name: Update README with current status
+      run: |
+        python scripts/update-readme-status.py
+    
+    - name: Build documentation site
+      run: |
+        mkdocs build
+    
+    - name: Deploy to GitHub Pages
+      if: github.ref == 'refs/heads/main'
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./site
