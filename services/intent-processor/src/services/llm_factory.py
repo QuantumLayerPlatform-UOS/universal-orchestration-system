@@ -54,7 +54,7 @@ class OllamaProvider(LLMProvider):
             async with self.session.post(
                 f"{self.base_url}/api/generate",
                 json=payload,
-                timeout=aiohttp.ClientTimeout(total=30)
+                timeout=aiohttp.ClientTimeout(total=60)
             ) as response:
                 if response.status == 200:
                     data = await response.json()
@@ -107,7 +107,7 @@ class GroqProvider(LLMProvider):
             async with self.session.post(
                 f"{self.base_url}/chat/completions",
                 json=payload,
-                timeout=aiohttp.ClientTimeout(total=30)
+                timeout=aiohttp.ClientTimeout(total=60)
             ) as response:
                 if response.status == 200:
                     data = await response.json()
@@ -152,7 +152,7 @@ class OpenAIProvider(LLMProvider):
             async with self.session.post(
                 f"{self.base_url}/chat/completions",
                 json=payload,
-                timeout=aiohttp.ClientTimeout(total=30)
+                timeout=aiohttp.ClientTimeout(total=60)
             ) as response:
                 if response.status == 200:
                     data = await response.json()
@@ -200,7 +200,7 @@ class AnthropicProvider(LLMProvider):
             async with self.session.post(
                 f"{self.base_url}/messages",
                 json=payload,
-                timeout=aiohttp.ClientTimeout(total=30)
+                timeout=aiohttp.ClientTimeout(total=60)
             ) as response:
                 if response.status == 200:
                     data = await response.json()

@@ -3,6 +3,7 @@ Intent Processor Service - Main Application
 Processes natural language requirements and breaks them down into actionable tasks
 """
 
+import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -23,9 +24,7 @@ from .models import (
     ErrorResponse,
     TaskBreakdown
 )
-from .services.intent_analyzer import IntentAnalyzer
-from .services.mock_intent_analyzer import MockIntentAnalyzer
-from .services.real_intent_analyzer import RealIntentAnalyzer
+from .services.robust_intent_analyzer import RobustIntentAnalyzer
 from .services.prompt_manager import PromptManager
 from .utils.resilience import (
     retry_with_backoff,
@@ -84,32 +83,30 @@ async def lifespan(app: FastAPI):
         azure_key = os.getenv("AZURE_OPENAI_API_KEY", "")
         azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "")
         
-        # Check for real LLM providers first
-        use_real_llm = any([
-            os.getenv("OLLAMA_BASE_URL"),
-            os.getenv("GROQ_API_KEY"),
-            os.getenv("OPENAI_API_KEY"),
-            os.getenv("ANTHROPIC_API_KEY")
-        ])
+        # Initialize Redis for caching
+        redis_client = None
+        try:
+            import redis
+            redis_url = os.getenv("REDIS_URL", "redis://:redis123@redis:6379")
+            redis_client = redis.from_url(redis_url, decode_responses=True)
+            redis_client.ping()
+            logger.info("Redis connected for caching")
+        except Exception as e:
+            logger.warning(f"Redis not available, using local cache only: {str(e)}")
         
-        if use_real_llm:
-            # Use real LLM analyzer
-            app.state.prompt_manager = PromptManager()
-            app.state.intent_analyzer = RealIntentAnalyzer()
-            await app.state.intent_analyzer.initialize()
-            logger.info("Services initialized with real LLM provider")
-        elif azure_key and azure_endpoint and azure_key != "dummy-key":
-            # Use Azure OpenAI analyzer
-            app.state.prompt_manager = PromptManager()
-            app.state.intent_analyzer = IntentAnalyzer(app.state.prompt_manager)
-            await app.state.intent_analyzer.initialize()
-            logger.info("Services initialized with Azure OpenAI")
+        # Use robust analyzer with multiple strategies
+        app.state.prompt_manager = PromptManager()
+        app.state.intent_analyzer = RobustIntentAnalyzer(redis_client=redis_client)
+        await app.state.intent_analyzer.initialize()
+        
+        # Log available providers
+        from .services.llm_factory import llm_factory
+        available_providers = await llm_factory.get_available_providers()
+        if available_providers:
+            logger.info(f"Initialized with LLM providers: {', '.join(available_providers)}")
         else:
-            # Use mock analyzer for testing
-            app.state.prompt_manager = PromptManager()  # Initialize prompt manager even for mock
-            app.state.intent_analyzer = MockIntentAnalyzer()
-            await app.state.intent_analyzer.initialize()
-            logger.warning("Using mock intent analyzer (no LLM credentials)")
+            logger.warning("No LLM providers configured - using fallback analysis")
+            logger.info("Configure one of: OLLAMA_BASE_URL, GROQ_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY")
         
         # Register health checks
         app.state.health_checker.register_check(
@@ -287,20 +284,22 @@ async def process_intent(request: IntentRequest, req: Request) -> IntentResponse
             }
         )
         
-        # Process the intent with timeout
-        @intent_processor_circuit
-        @retry_with_backoff(retries=2, backoff_in_seconds=1)
-        async def analyze_with_resilience():
-            return await timeout_wrapper(
+        # Process the intent with timeout and retry
+        try:
+            result = await timeout_wrapper(
                 req.app.state.intent_analyzer.analyze_intent(
                     text=request.text,
                     context=request.context,
                     project_info=request.project_info
                 ),
-                timeout=10.0  # 10 second timeout
+                timeout=60.0  # 60 second timeout for LLM calls
             )
-        
-        result = await analyze_with_resilience()
+        except asyncio.TimeoutError:
+            logger.error(f"Intent processing timed out for request {request.request_id}")
+            raise HTTPException(
+                status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+                detail="Processing timeout"
+            )
         
         # Record success metric
         intent_processing_counter.labels(status="success").inc()
@@ -392,6 +391,38 @@ async def get_prompt_templates(req: Request) -> Dict[str, Any]:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve prompt templates"
         )
+
+
+@app.get("/api/v1/test-llm")
+async def test_llm(req: Request) -> Dict[str, Any]:
+    """Test LLM connectivity"""
+    try:
+        from .services.llm_factory import llm_factory
+        
+        # Get available providers
+        available = await llm_factory.get_available_providers()
+        
+        # Try a simple generation
+        provider = await llm_factory.get_provider()
+        test_response = None
+        if provider:
+            try:
+                test_response = await provider.generate("Say hello", temperature=0.7, max_tokens=20)
+            except Exception as e:
+                test_response = f"Error: {str(e)}"
+        
+        return {
+            "available_providers": available,
+            "active_provider": provider.__class__.__name__ if provider else None,
+            "test_response": test_response,
+            "timestamp": datetime.utcnow()
+        }
+    except Exception as e:
+        logger.error(f"LLM test failed: {str(e)}")
+        return {
+            "error": str(e),
+            "timestamp": datetime.utcnow()
+        }
 
 
 if __name__ == "__main__":

@@ -17,12 +17,16 @@ from ..models import (
     IntentAnalysisResult
 )
 from .llm_factory import llm_factory
+from .meta_prompt_agent import MetaPromptAgent
 
 logger = logging.getLogger(__name__)
 
 
 class RealIntentAnalyzer:
-    """Intent analyzer using real LLM providers"""
+    """Intent analyzer using real LLM providers with meta-prompt capabilities"""
+    
+    def __init__(self):
+        self.meta_agent = MetaPromptAgent()
     
     async def initialize(self):
         """Initialize the analyzer"""
@@ -52,12 +56,18 @@ class RealIntentAnalyzer:
             logger.warning("No LLM provider available, falling back to basic analysis")
             return self._basic_analysis(text)
             
-        # Create prompt for intent analysis
-        prompt = self._create_intent_prompt(text, context, project_info)
+        # Use meta-prompt agent for intelligent analysis
+        prompt = self.meta_agent.generate_context_aware_prompt(text, context)
         
         try:
             # Generate response from LLM
-            response = await provider.generate(prompt, temperature=0.3)
+            logger.info(f"Sending prompt to LLM provider: {provider.__class__.__name__}")
+            logger.debug(f"Prompt: {prompt}")
+            
+            response = await provider.generate(prompt, temperature=0.3, max_tokens=800)
+            
+            logger.info(f"Received response from LLM, length: {len(response)} characters")
+            logger.debug(f"LLM Response: {response}")
             
             # Parse LLM response
             result = self._parse_llm_response(response, text)
@@ -73,48 +83,47 @@ class RealIntentAnalyzer:
         context: Optional[Dict[str, Any]], 
         project_info: Optional[Dict[str, Any]]
     ) -> str:
-        """Create prompt for LLM"""
+        """Create optimized prompt for LLM"""
         
-        prompt = f"""Analyze the following software development request and provide a structured response.
+        # Dynamic NLP-based prompt
+        prompt = f"""You are an expert software architect. Analyze this natural language request and understand what the user wants to build:
 
-Request: {text}
+"{text}"
 
-Context: {json.dumps(context or {}, indent=2)}
+Based on your understanding, categorize the intent and break it down into actionable tasks.
 
-Project Info: {json.dumps(project_info or {}, indent=2)}
+Valid intent types: feature_request, bug_fix, refactoring, documentation, testing, deployment, configuration, research, unknown
 
-Provide your analysis in the following JSON format:
+Valid task types: frontend, backend, database, api, infrastructure, testing, documentation, design, devops, security
+
+Valid priorities: critical, high, medium, low
+
+Valid complexities: simple, moderate, complex, very_complex
+
+Analyze the request deeply and respond with JSON only:
 {{
-    "intent_type": "one of: CREATE_FEATURE, FIX_BUG, IMPROVE_PERFORMANCE, REFACTOR_CODE, ADD_DOCUMENTATION, ADD_TESTS, DEPLOY, UNKNOWN",
-    "confidence": 0.0-1.0,
-    "summary": "brief summary of what needs to be done",
-    "tasks": [
-        {{
-            "name": "task name",
-            "description": "detailed description",
-            "type": "one of: DESIGN, IMPLEMENTATION, TESTING, DOCUMENTATION, DEPLOYMENT",
-            "priority": "one of: HIGH, MEDIUM, LOW",
-            "complexity": "one of: SIMPLE, MEDIUM, COMPLEX",
-            "estimated_effort": minutes_as_integer,
-            "required_skills": ["skill1", "skill2"],
-            "dependencies": []
-        }}
-    ],
-    "metadata": {{
-        "key_technologies": ["tech1", "tech2"],
-        "estimated_total_effort": total_minutes,
-        "risk_factors": ["risk1", "risk2"]
+  "intent_type": "<detected intent>",
+  "confidence": <0.0-1.0>,
+  "summary": "<what user wants to achieve>",
+  "tasks": [
+    {{
+      "id": "<unique_id>",
+      "title": "<task title>",
+      "description": "<detailed description>",
+      "type": "<task type>",
+      "priority": "<priority>",
+      "complexity": "<complexity>",
+      "estimated_hours": <number>,
+      "dependencies": [],
+      "tags": ["<relevant tags>"]
     }}
-}}
-
-Important:
-- Break down the request into concrete, actionable tasks
-- Each task should be specific and measurable
-- Consider dependencies between tasks
-- Estimate effort realistically
-- Identify required skills and technologies
-
-Response (JSON only):"""
+  ],
+  "metadata": {{
+    "key_entities": ["<detected entities>"],
+    "technologies": ["<detected technologies>"],
+    "domain": "<detected domain>"
+  }}
+}}"""
         
         return prompt
         
@@ -122,34 +131,59 @@ Response (JSON only):"""
         """Parse LLM response into structured result"""
         
         try:
-            # Extract JSON from response
-            json_match = re.search(r'\{.*\}', response, re.DOTALL)
-            if json_match:
-                data = json.loads(json_match.group())
+            # Clean and extract JSON from response
+            response = response.strip()
+            
+            # Try to find JSON in the response
+            json_start = response.find('{')
+            json_end = response.rfind('}') + 1
+            
+            if json_start >= 0 and json_end > json_start:
+                json_str = response[json_start:json_end]
+                data = json.loads(json_str)
             else:
+                # Try direct parsing
                 data = json.loads(response)
                 
-            # Convert to our models
+            # Convert to our models with validation
             tasks = []
             for task_data in data.get('tasks', []):
-                task = Task(
+                try:
+                    task = Task(
+                        id=str(uuid4()),
+                        name=task_data.get('name', 'Unnamed task'),
+                        description=task_data.get('description', 'No description'),
+                        type=TaskType(task_data.get('type', 'IMPLEMENTATION')),
+                        priority=TaskPriority(task_data.get('priority', 'MEDIUM')),
+                        complexity=TaskComplexity(task_data.get('complexity', 'MEDIUM')),
+                        estimated_effort=task_data.get('estimated_effort', 60),
+                        required_skills=task_data.get('required_skills', []),
+                        dependencies=task_data.get('dependencies', []),
+                        metadata=task_data.get('metadata', {})
+                    )
+                    tasks.append(task)
+                except Exception as e:
+                    logger.warning(f"Failed to parse task: {str(e)}")
+                    
+            # Ensure we have at least one task
+            if not tasks:
+                tasks = [Task(
                     id=str(uuid4()),
-                    name=task_data['name'],
-                    description=task_data['description'],
-                    type=TaskType(task_data['type']),
-                    priority=TaskPriority(task_data['priority']),
-                    complexity=TaskComplexity(task_data['complexity']),
-                    estimated_effort=task_data['estimated_effort'],
-                    required_skills=task_data['required_skills'],
-                    dependencies=task_data.get('dependencies', []),
-                    metadata=task_data.get('metadata', {})
-                )
-                tasks.append(task)
+                    name="Implement request",
+                    description=f"Implementation of: {original_text}",
+                    type=TaskType.IMPLEMENTATION,
+                    priority=TaskPriority.MEDIUM,
+                    complexity=TaskComplexity.MEDIUM,
+                    estimated_effort=120,
+                    required_skills=["general"],
+                    dependencies=[],
+                    metadata={}
+                )]
                 
             return IntentAnalysisResult(
-                intent_type=IntentType(data['intent_type']),
-                confidence=data['confidence'],
-                summary=data['summary'],
+                intent_type=IntentType(data.get('intent_type', 'UNKNOWN')),
+                confidence=float(data.get('confidence', 0.5)),
+                summary=data.get('summary', 'Analysis complete'),
                 tasks=tasks,
                 metadata=data.get('metadata', {})
             )
