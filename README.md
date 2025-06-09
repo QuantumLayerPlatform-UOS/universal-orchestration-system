@@ -56,10 +56,32 @@ QLP-UOS/
 
 ## 🚀 Quick Start
 
+### Using Ollama (Recommended for Development)
+
+1. **Start with Ollama**:
+```bash
+./scripts/start-with-ollama.sh
+```
+
+2. **Create a Dynamic Agent**:
+```bash
+python examples/create-dynamic-agent.py
+```
+
+3. **Run Integration Tests**:
+```bash
+python tests/integration/test_meta_prompt_agent.py
+```
+
+### Traditional Setup
+
 1. **Prerequisites**: Docker, kubectl, Go 1.21+, Node.js 20+, Python 3.11+
 2. **Setup**: `./scripts/setup-dev.sh`
-3. **Local Development**: `docker-compose up -d`
-4. **Access**: http://localhost:3000
+3. **Local Development**: `docker-compose -f docker-compose.minimal.yml up -d`
+4. **Access**: 
+   - Orchestrator: http://localhost:8080
+   - Intent Processor: http://localhost:8081
+   - Agent Manager: http://localhost:8082
 
 ## 👥 Team
 
