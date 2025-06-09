@@ -41,8 +41,16 @@ const AGENT_CONFIG = {
       description: 'Generate code from templates',
       version: '1.0.0'
     },
-    'javascript',  // Add language support
-    'multi-language'  // Support multiple languages
+    {
+      name: 'javascript-support',
+      description: 'Generate JavaScript code',
+      version: '1.0.0'
+    },
+    {
+      name: 'multi-language-support',
+      description: 'Support for multiple programming languages',
+      version: '1.0.0'
+    }
   ],
   status: 'idle'
 };
