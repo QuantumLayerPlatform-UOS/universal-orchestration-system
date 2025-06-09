@@ -174,6 +174,28 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # Meta-Prompt Orchestrator for Dynamic Agents
+  meta-prompt-agent:
+    build:
+      context: ./services/agents/meta-prompt-agent
+      dockerfile: Dockerfile
+    environment:
+      - NODE_ENV=production
+      - META_AGENT_ID=meta-prompt-orchestrator
+      - AGENT_MANAGER_URL=http://agent-manager:8082
+      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY:-dummy-key}
+      - AZURE_OPENAI_INSTANCE_NAME=${AZURE_OPENAI_INSTANCE_NAME:-dummy-instance}
+      - AZURE_OPENAI_DEPLOYMENT_NAME=${AZURE_OPENAI_DEPLOYMENT_NAME:-gpt-35-turbo}
+      - AZURE_OPENAI_API_VERSION=2023-05-15
+      - REDIS_URL=redis://:redis123@redis:6379
+      - LOG_LEVEL=info
+    depends_on:
+      agent-manager:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   mongo_data:

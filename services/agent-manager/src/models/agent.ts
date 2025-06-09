@@ -8,7 +8,9 @@ export enum AgentType {
   SECURITY = 'security',
   DOCUMENTATION = 'documentation',
   REVIEW = 'review',
-  OPTIMIZATION = 'optimization'
+  OPTIMIZATION = 'optimization',
+  META_PROMPT = 'meta-prompt',
+  DYNAMIC = 'dynamic'
 }
 
 export enum AgentStatus {
@@ -67,6 +69,12 @@ export interface Agent extends Document {
     platform: string;
     region?: string;
     tags?: string[];
+    isDynamic?: boolean;
+    ttl?: number;
+    spawnedAt?: string;
+    designVersion?: string;
+    systemPrompt?: string;
+    parentAgentId?: string;
   };
   metrics: AgentMetrics;
   lastHeartbeat: Date;
