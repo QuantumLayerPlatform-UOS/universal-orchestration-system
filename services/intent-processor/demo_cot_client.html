@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chain of Thought Demo - Intent Processor</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            resize: vertical;
+            min-height: 100px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .thoughts-container {
+            margin-top: 30px;
+            border-top: 1px solid #eee;
+            padding-top: 20px;
+        }
+        .thought {
+            margin-bottom: 15px;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            border-left: 3px solid #007bff;
+            animation: slideIn 0.3s ease-out;
+        }
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        .thought-time {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 4px;
+        }
+        .thought-message {
+            font-size: 16px;
+            color: #333;
+            margin-bottom: 4px;
+        }
+        .thought-detail {
+            font-size: 14px;
+            color: #666;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #eee;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #007bff;
+            transition: width 0.3s ease-out;
+        }
+        .result-container {
+            margin-top: 20px;
+            padding: 20px;
+            background: #e8f5e9;
+            border-radius: 4px;
+            border: 1px solid #4caf50;
+        }
+        .error-container {
+            margin-top: 20px;
+            padding: 20px;
+            background: #ffebee;
+            border-radius: 4px;
+            border: 1px solid #f44336;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧠 Chain of Thought Intent Processor</h1>
+        
+        <div class="input-group">
+            <textarea id="requestInput" placeholder="Enter your request... e.g., 'Build a real-time chat application with user authentication'"></textarea>
+        </div>
+        
+        <button id="processBtn" onclick="processIntent()">Process Intent</button>
+        
+        <div id="thoughtsContainer" class="thoughts-container" style="display: none;">
+            <h3>Chain of Thought:</h3>
+            <div id="thoughts"></div>
+        </div>
+        
+        <div id="resultContainer" style="display: none;"></div>
+    </div>
+
+    <script>
+        let eventSource = null;
+        let currentRequestId = null;
+
+        async function processIntent() {
+            const input = document.getElementById('requestInput').value.trim();
+            if (!input) {
+                alert('Please enter a request');
+                return;
+            }
+
+            // Generate request ID
+            currentRequestId = 'demo-' + Date.now();
+            
+            // Clear previous results
+            document.getElementById('thoughts').innerHTML = '';
+            document.getElementById('resultContainer').innerHTML = '';
+            document.getElementById('resultContainer').style.display = 'none';
+            document.getElementById('thoughtsContainer').style.display = 'block';
+            
+            // Disable button
+            document.getElementById('processBtn').disabled = true;
+            
+            // Start SSE connection for thoughts
+            startThoughtStream(currentRequestId);
+            
+            // Send the actual request
+            try {
+                const response = await fetch('http://localhost:8081/api/v1/process-intent', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        text: input,
+                        request_id: currentRequestId
+                    })
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    displayResult(result);
+                } else {
+                    displayError('Failed to process request');
+                }
+            } catch (error) {
+                displayError('Network error: ' + error.message);
+            } finally {
+                // Re-enable button
+                document.getElementById('processBtn').disabled = false;
+                
+                // Close SSE connection
+                if (eventSource) {
+                    eventSource.close();
+                }
+            }
+        }
+
+        function startThoughtStream(requestId) {
+            eventSource = new EventSource(`http://localhost:8081/api/v1/process-intent/${requestId}/stream`);
+            
+            eventSource.onmessage = (event) => {
+                try {
+                    const thought = JSON.parse(event.data);
+                    displayThought(thought);
+                } catch (e) {
+                    console.error('Failed to parse thought:', e);
+                }
+            };
+            
+            eventSource.onerror = (error) => {
+                console.error('SSE error:', error);
+                eventSource.close();
+            };
+        }
+
+        function displayThought(thought) {
+            const thoughtsDiv = document.getElementById('thoughts');
+            
+            const thoughtElement = document.createElement('div');
+            thoughtElement.className = 'thought';
+            
+            // Time
+            const timeDiv = document.createElement('div');
+            timeDiv.className = 'thought-time';
+            timeDiv.textContent = new Date(thought.timestamp).toLocaleTimeString();
+            thoughtElement.appendChild(timeDiv);
+            
+            // Message
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'thought-message';
+            messageDiv.textContent = thought.message;
+            thoughtElement.appendChild(messageDiv);
+            
+            // Detail
+            if (thought.detail) {
+                const detailDiv = document.createElement('div');
+                detailDiv.className = 'thought-detail';
+                detailDiv.textContent = thought.detail;
+                thoughtElement.appendChild(detailDiv);
+            }
+            
+            // Progress bar
+            if (thought.progress !== null && thought.progress !== undefined) {
+                const progressBar = document.createElement('div');
+                progressBar.className = 'progress-bar';
+                
+                const progressFill = document.createElement('div');
+                progressFill.className = 'progress-fill';
+                progressFill.style.width = (thought.progress * 100) + '%';
+                
+                progressBar.appendChild(progressFill);
+                thoughtElement.appendChild(progressBar);
+            }
+            
+            thoughtsDiv.appendChild(thoughtElement);
+            
+            // Scroll to bottom
+            thoughtsDiv.scrollTop = thoughtsDiv.scrollHeight;
+        }
+
+        function displayResult(result) {
+            const container = document.getElementById('resultContainer');
+            container.style.display = 'block';
+            container.className = 'result-container';
+            
+            let html = '<h3>✅ Analysis Complete</h3>';
+            html += `<p><strong>Intent Type:</strong> ${result.intent_type}</p>`;
+            html += `<p><strong>Confidence:</strong> ${(result.confidence * 100).toFixed(0)}%</p>`;
+            html += `<p><strong>Summary:</strong> ${result.summary}</p>`;
+            
+            if (result.tasks && result.tasks.length > 0) {
+                html += '<h4>Tasks:</h4><ul>';
+                result.tasks.forEach(task => {
+                    html += `<li><strong>${task.title}</strong> - ${task.estimated_hours} hours (${task.priority} priority)</li>`;
+                });
+                html += '</ul>';
+            }
+            
+            container.innerHTML = html;
+        }
+
+        function displayError(message) {
+            const container = document.getElementById('resultContainer');
+            container.style.display = 'block';
+            container.className = 'error-container';
+            container.innerHTML = `<h3>❌ Error</h3><p>${message}</p>`;
+        }
+    </script>
+</body>
+</html>

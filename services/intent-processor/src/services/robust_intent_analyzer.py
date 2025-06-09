@@ -20,6 +20,7 @@ from ..models import (
 from .llm_factory import llm_factory
 from .meta_prompt_agent import MetaPromptAgent
 from .intent_cache import IntentCache
+from .thought_stream import thought_stream, ThoughtType
 
 logger = logging.getLogger(__name__)
 
@@ -57,30 +58,82 @@ class RobustIntentAnalyzer:
         self,
         text: str,
         context: Optional[Dict[str, Any]] = None,
-        project_info: Optional[Dict[str, Any]] = None
+        project_info: Optional[Dict[str, Any]] = None,
+        request_id: Optional[str] = None
     ) -> IntentAnalysisResult:
         """Analyze intent using multiple strategies with fallbacks"""
         
         logger.info(f"Starting intent analysis for: {text[:100]}...")
         
+        # Emit initial thought if request_id provided
+        if request_id:
+            await thought_stream.emit_thought(
+                request_id,
+                ThoughtType.UNDERSTANDING,
+                detail=f"Processing {len(text)} character request",
+                progress=0.05
+            )
+        
         # Check cache first
         cached_result = await self.cache.get(text, context)
         if cached_result:
             logger.info("Returning cached result")
+            if request_id:
+                await thought_stream.emit_thought(
+                    request_id,
+                    ThoughtType.COMPLETE,
+                    detail="Found in cache",
+                    progress=1.0
+                )
             return cached_result
         
         # Try each strategy in order
         for i, strategy in enumerate(self.strategies):
             try:
                 logger.info(f"Attempting strategy {i+1}: {strategy.__name__}")
-                result = await strategy(text, context, project_info)
+                
+                # Emit progress update
+                if request_id:
+                    progress = 0.1 + (i * 0.15)  # Progress from 0.1 to 0.85
+                    await thought_stream.emit_thought(
+                        request_id,
+                        ThoughtType.ANALYZING,
+                        detail=f"Trying strategy: {strategy.__name__.replace('_', ' ').title()}",
+                        progress=progress
+                    )
+                
+                result = await strategy(text, context, project_info, request_id)
                 if result:
                     logger.info(f"Strategy {strategy.__name__} succeeded")
+                    
+                    # Emit final analysis details
+                    if request_id:
+                        await thought_stream.emit_detailed_analysis(
+                            request_id,
+                            {
+                                'text': text,
+                                'domain': self.meta_agent.analyze_domain(text),
+                                'intent_type': result.intent_type.value,
+                                'confidence': result.confidence,
+                                'task_count': len(result.tasks),
+                                'total_hours': sum(t.estimated_hours for t in result.tasks)
+                            }
+                        )
+                    
                     # Cache the successful result
                     await self.cache.set(text, result, context)
                     return result
             except Exception as e:
                 logger.warning(f"Strategy {strategy.__name__} failed: {str(e)}")
+                
+                # Emit error thought
+                if request_id:
+                    await thought_stream.emit_thought(
+                        request_id,
+                        ThoughtType.ERROR,
+                        detail=f"Strategy failed: {strategy.__name__}",
+                        metadata={"error": str(e)}
+                    )
                 continue
                 
         # If all strategies fail, return a basic result
@@ -94,7 +147,8 @@ class RobustIntentAnalyzer:
         self, 
         text: str, 
         context: Optional[Dict[str, Any]], 
-        project_info: Optional[Dict[str, Any]]
+        project_info: Optional[Dict[str, Any]],
+        request_id: Optional[str] = None
     ) -> Optional[IntentAnalysisResult]:
         """Use LLM with structured output format"""
         

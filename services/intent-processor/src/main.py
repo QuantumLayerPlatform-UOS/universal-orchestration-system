@@ -12,7 +12,7 @@ from typing import Dict, Any
 
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from prometheus_client import Counter, Histogram, generate_latest
 from prometheus_client.core import CollectorRegistry
 from pythonjsonlogger import jsonlogger
@@ -26,6 +26,7 @@ from .models import (
 )
 from .services.robust_intent_analyzer import RobustIntentAnalyzer
 from .services.prompt_manager import PromptManager
+from .services.thought_stream import thought_stream
 from .utils.resilience import (
     retry_with_backoff,
     CircuitBreaker,
@@ -263,6 +264,34 @@ async def metrics():
 # Apply circuit breaker to the intent processing
 intent_processor_circuit = CircuitBreaker(failure_threshold=5, recovery_timeout=30)
 
+@app.get("/api/v1/process-intent/{request_id}/stream")
+async def stream_intent_thoughts(request_id: str):
+    """Stream Chain of Thought updates for an intent processing request"""
+    
+    async def event_generator():
+        try:
+            # Create stream for this request
+            await thought_stream.create_stream(request_id)
+            
+            # Stream thoughts
+            async for event in thought_stream.stream_thoughts(request_id):
+                yield event
+                
+        except Exception as e:
+            logger.error(f"Streaming error: {str(e)}")
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+    
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"  # Disable Nginx buffering
+        }
+    )
+
+
 @app.post("/api/v1/process-intent", response_model=IntentResponse)
 @rate_limit(rate=100, per=60.0)  # 100 requests per minute
 async def process_intent(request: IntentRequest, req: Request) -> IntentResponse:
@@ -290,7 +319,8 @@ async def process_intent(request: IntentRequest, req: Request) -> IntentResponse
                 req.app.state.intent_analyzer.analyze_intent(
                     text=request.text,
                     context=request.context,
-                    project_info=request.project_info
+                    project_info=request.project_info,
+                    request_id=request.request_id  # Pass request_id for streaming
                 ),
                 timeout=60.0  # 60 second timeout for LLM calls
             )
