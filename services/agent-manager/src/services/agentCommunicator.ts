@@ -32,10 +32,10 @@ export class AgentCommunicator extends EventEmitter {
     super();
     this.io = io;
     this.agentRegistry = agentRegistry;
-    this.setupOrchestorListeners();
+    this.setupOrchestratorListeners();
   }
 
-  private setupOrchestorListeners(): void {
+  private setupOrchestratorListeners(): void {
     // Listen for task assignments from orchestrator
     this.agentRegistry.on('task:assigned', (task: Task, agent: Agent) => {
       this.sendTaskToAgent(agent.id, task);
@@ -60,7 +60,7 @@ export class AgentCommunicator extends EventEmitter {
     const agentVerificationPromise = new Promise<void>(async (resolve, reject) => {
       try {
         // First, try to get the agent from registry
-        const existingAgent = await this.agentRegistry.getAgent(agentId);
+        const existingAgent = await this.agentRegistry.getAgentAsync(agentId);
         
         if (existingAgent) {
           // Agent exists, update status
