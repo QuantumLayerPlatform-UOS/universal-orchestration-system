@@ -25,12 +25,13 @@ const (
 type WorkflowType string
 
 const (
-	WorkflowTypeIntent    WorkflowType = "intent_processing"
-	WorkflowTypeExecution WorkflowType = "code_execution"
-	WorkflowTypeAnalysis  WorkflowType = "code_analysis"
-	WorkflowTypeReview    WorkflowType = "code_review"
-	WorkflowTypeDeployment WorkflowType = "deployment"
-	WorkflowTypeCustom    WorkflowType = "custom"
+	WorkflowTypeIntent       WorkflowType = "intent_processing"
+	WorkflowTypeExecution    WorkflowType = "code_execution"
+	WorkflowTypeAnalysis     WorkflowType = "code_analysis"
+	WorkflowTypeReview       WorkflowType = "code_review"
+	WorkflowTypeDeployment   WorkflowType = "deployment"
+	WorkflowTypeTaskExecution WorkflowType = "task_execution"
+	WorkflowTypeCustom       WorkflowType = "custom"
 )
 
 // WorkflowPriority represents the priority of a workflow

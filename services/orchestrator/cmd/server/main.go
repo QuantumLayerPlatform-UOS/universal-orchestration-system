@@ -265,6 +265,12 @@ func setupRouter(h *api.Handlers, cfg *config.Config, logger *zap.Logger) *gin.E
 		agents.POST("/:id/restart", h.RestartAgent)
 	}
 
+	// Demo endpoints
+	demo := v1.Group("/demo")
+	{
+		demo.POST("/intent-to-execution", h.DemoIntentToExecution)
+	}
+
 	return router
 }
 

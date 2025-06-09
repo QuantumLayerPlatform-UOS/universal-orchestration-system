@@ -219,11 +219,16 @@ func (a *Activities) SelectAgentActivity(ctx context.Context, req CodeExecutionR
 	// Select agent based on language and capabilities
 	for _, agent := range agents.Agents {
 		for _, capability := range agent.Capabilities {
-			if capability == req.Language || capability == "multi-language" {
+			if capability.Name == req.Language || capability.Name == "multi-language" {
+				agentCapNames := make([]string, len(agent.Capabilities))
+				for i, cap := range agent.Capabilities {
+					agentCapNames[i] = cap.Name
+				}
+				
 				return &AgentInfo{
 					ID:           agent.ID,
 					Type:         agent.Type,
-					Capabilities: agent.Capabilities,
+					Capabilities: agentCapNames,
 					Status:       agent.Status,
 				}, nil
 			}

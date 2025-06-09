@@ -310,6 +310,8 @@ func (e *WorkflowEngine) getWorkflowFunction(workflowType models.WorkflowType) i
 		return "CodeReviewWorkflow"
 	case models.WorkflowTypeDeployment:
 		return "DeploymentWorkflow"
+	case models.WorkflowTypeTaskExecution:
+		return "TaskExecutionWorkflow"
 	default:
 		return "CustomWorkflow"
 	}

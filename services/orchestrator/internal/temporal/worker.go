@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"go.temporal.io/sdk/activity"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/worker"
 	"go.temporal.io/api/workflowservice/v1"
@@ -17,12 +18,13 @@ import (
 
 // Worker represents a Temporal worker
 type Worker struct {
-	client       client.Client
-	worker       worker.Worker
-	logger       *zap.Logger
-	config       *config.TemporalConfig
-	workflows    *WorkflowEngine
-	activities   *Activities
+	client            client.Client
+	worker            worker.Worker
+	logger            *zap.Logger
+	config            *config.TemporalConfig
+	workflows         *WorkflowEngine
+	activities        *Activities
+	metaAgentActivities *MetaAgentActivities
 }
 
 // NewWorker creates a new Temporal worker
@@ -45,6 +47,9 @@ func NewWorker(
 	// Create activities
 	activities := NewActivities(db, logger, intentClient, agentClient)
 
+	// Create meta-agent activities
+	metaAgentActivities := NewMetaAgentActivities(agentClient, logger)
+
 	// Create worker
 	w := worker.New(temporalClient, cfg.TaskQueue, worker.Options{
 		MaxConcurrentActivityExecutionSize:      cfg.WorkerOptions.MaxConcurrentActivityExecutionSize,
@@ -66,21 +71,22 @@ func NewWorker(
 	registerWorkflows(w, workflowEngine)
 
 	// Register activities
-	registerActivities(w, activities)
+	registerActivities(w, activities, metaAgentActivities)
 
 	return &Worker{
-		client:     temporalClient,
-		worker:     w,
-		logger:     logger,
-		config:     cfg,
-		workflows:  workflowEngine,
-		activities: activities,
+		client:              temporalClient,
+		worker:              w,
+		logger:              logger,
+		config:              cfg,
+		workflows:           workflowEngine,
+		activities:          activities,
+		metaAgentActivities: metaAgentActivities,
 	}, nil
 }
 
 // Start starts the worker
 func (w *Worker) Start() error {
-	w.logger.Info("Starting Temporal worker",
+	w.logger.Info("Starting Temporal worker with meta-agent integration",
 		zap.String("task_queue", w.config.TaskQueue),
 		zap.String("namespace", w.config.Namespace),
 	)
@@ -91,7 +97,7 @@ func (w *Worker) Start() error {
 		return fmt.Errorf("failed to start worker: %w", err)
 	}
 
-	w.logger.Info("Temporal worker started successfully")
+	w.logger.Info("Temporal worker started successfully with meta-agent capabilities")
 	return nil
 }
 
@@ -162,11 +168,12 @@ func registerWorkflows(w worker.Worker, engine *WorkflowEngine) {
 	w.RegisterWorkflow(engine.CodeAnalysisWorkflow)
 	w.RegisterWorkflow(engine.CodeReviewWorkflow)
 	w.RegisterWorkflow(engine.DeploymentWorkflow)
+	w.RegisterWorkflow(engine.TaskExecutionWorkflow)
 	w.RegisterWorkflow(engine.CustomWorkflow)
 }
 
 // registerActivities registers all activities with the worker
-func registerActivities(w worker.Worker, activities *Activities) {
+func registerActivities(w worker.Worker, activities *Activities, metaAgentActivities *MetaAgentActivities) {
 	// Intent processing activities
 	w.RegisterActivity(activities.AnalyzeIntentActivity)
 	w.RegisterActivity(activities.CreateExecutionPlanActivity)
@@ -179,6 +186,26 @@ func registerActivities(w worker.Worker, activities *Activities) {
 	w.RegisterActivity(activities.ExecuteCodeActivity)
 	w.RegisterActivity(activities.ProcessResultsActivity)
 	w.RegisterActivity(activities.CleanupEnvironmentActivity)
+
+	// Original task execution activities (kept for compatibility)
+	w.RegisterActivity(activities.FindOrCreateAgentForTaskActivity)
+	w.RegisterActivity(activities.ExecuteTaskWithAgentActivity)
+	w.RegisterActivity(activities.AggregateTaskResultsActivity)
+	w.RegisterActivity(activities.StoreArtifactsActivity)
+
+	// 🚀 NEW: Meta-Agent Integration Activities
+	w.RegisterActivityWithOptions(
+		metaAgentActivities.FindOrCreateAgentForTaskActivity,
+		activity.RegisterOptions{Name: "MetaAgentFindOrCreateAgentForTaskActivity"},
+	)
+	w.RegisterActivityWithOptions(
+		metaAgentActivities.ExecuteTaskWithAgentActivity,
+		activity.RegisterOptions{Name: "MetaAgentExecuteTaskWithAgentActivity"},
+	)
+	w.RegisterActivityWithOptions(
+		metaAgentActivities.OptimizeAgentPerformanceActivity,
+		activity.RegisterOptions{Name: "MetaAgentOptimizeAgentPerformanceActivity"},
+	)
 
 	// Code analysis activities
 	w.RegisterActivity(activities.FetchCodeActivity)
@@ -256,11 +283,9 @@ func (l *TemporalLogger) fieldsFromKeyvals(keyvals []interface{}) []zap.Field {
 	return fields
 }
 
-// Placeholder activity functions for code review and deployment workflows
-// These would be implemented in the activities.go file
+// Placeholder activity functions - these would normally be in separate files
 
 func FetchCodeChangesActivity(ctx context.Context, req CodeReviewRequest) (*CodeChanges, error) {
-	// Implementation placeholder
 	return &CodeChanges{
 		Files:     []string{"file1.go", "file2.go"},
 		Additions: 100,
@@ -270,7 +295,6 @@ func FetchCodeChangesActivity(ctx context.Context, req CodeReviewRequest) (*Code
 }
 
 func RunAutomatedChecksActivity(ctx context.Context, changes CodeChanges) (*AutomatedCheckResults, error) {
-	// Implementation placeholder
 	return &AutomatedCheckResults{
 		Passed:   true,
 		Checks:   []interface{}{},
@@ -279,7 +303,6 @@ func RunAutomatedChecksActivity(ctx context.Context, changes CodeChanges) (*Auto
 }
 
 func RunAIReviewActivity(ctx context.Context, changes CodeChanges, checks AutomatedCheckResults) (*AIReviewResult, error) {
-	// Implementation placeholder
 	return &AIReviewResult{
 		Issues:      []interface{}{},
 		Suggestions: []interface{}{},
@@ -288,7 +311,6 @@ func RunAIReviewActivity(ctx context.Context, changes CodeChanges, checks Automa
 }
 
 func GenerateReviewSummaryActivity(ctx context.Context, checks AutomatedCheckResults, ai AIReviewResult) (*ReviewSummary, error) {
-	// Implementation placeholder
 	return &ReviewSummary{
 		Approved: true,
 		Comments: []interface{}{},
@@ -297,12 +319,10 @@ func GenerateReviewSummaryActivity(ctx context.Context, checks AutomatedCheckRes
 }
 
 func PostReviewCommentsActivity(ctx context.Context, summary ReviewSummary) error {
-	// Implementation placeholder
 	return nil
 }
 
 func ValidateDeploymentActivity(ctx context.Context, req DeploymentRequest) (*DeploymentValidation, error) {
-	// Implementation placeholder
 	return &DeploymentValidation{
 		IsValid: true,
 		Errors:  []string{},
@@ -310,7 +330,6 @@ func ValidateDeploymentActivity(ctx context.Context, req DeploymentRequest) (*De
 }
 
 func BuildArtifactsActivity(ctx context.Context, req DeploymentRequest) (*BuildResult, error) {
-	// Implementation placeholder
 	return &BuildResult{
 		ArtifactID: "artifact-123",
 		Version:    req.Version,
@@ -319,7 +338,6 @@ func BuildArtifactsActivity(ctx context.Context, req DeploymentRequest) (*BuildR
 }
 
 func RunDeploymentTestsActivity(ctx context.Context, build BuildResult) (*TestResult, error) {
-	// Implementation placeholder
 	return &TestResult{
 		Passed:   true,
 		Tests:    100,
@@ -329,7 +347,6 @@ func RunDeploymentTestsActivity(ctx context.Context, build BuildResult) (*TestRe
 }
 
 func DeployToStagingActivity(ctx context.Context, build BuildResult) (*DeploymentResult, error) {
-	// Implementation placeholder
 	return &DeploymentResult{
 		DeploymentID: "deploy-staging-123",
 		Environment:  "staging",
@@ -340,17 +357,15 @@ func DeployToStagingActivity(ctx context.Context, build BuildResult) (*Deploymen
 }
 
 func RunSmokeTestsActivity(ctx context.Context, deployment DeploymentResult) (*TestResult, error) {
-	// Implementation placeholder
 	return &TestResult{
 		Passed:   true,
 		Tests:    20,
 		Failures: 0,
-		Coverage: 0.0, // Not applicable for smoke tests
+		Coverage: 0.0,
 	}, nil
 }
 
 func DeployToProductionActivity(ctx context.Context, build BuildResult) (*DeploymentResult, error) {
-	// Implementation placeholder
 	return &DeploymentResult{
 		DeploymentID: "deploy-prod-123",
 		Environment:  "production",
@@ -361,7 +376,6 @@ func DeployToProductionActivity(ctx context.Context, build BuildResult) (*Deploy
 }
 
 func RunHealthCheckActivity(ctx context.Context, deployment DeploymentResult) (*HealthCheckResult, error) {
-	// Implementation placeholder
 	return &HealthCheckResult{
 		IsHealthy: true,
 		Checks: map[string]bool{
@@ -373,19 +387,95 @@ func RunHealthCheckActivity(ctx context.Context, deployment DeploymentResult) (*
 }
 
 func RollbackDeploymentActivity(ctx context.Context, deployment DeploymentResult) error {
-	// Implementation placeholder
 	return nil
 }
 
 func UpdateDeploymentStatusActivity(ctx context.Context, deployment DeploymentResult) error {
-	// Implementation placeholder
 	return nil
 }
 
 func ExecuteCustomStepActivity(ctx context.Context, step CustomStep) (interface{}, error) {
-	// Implementation placeholder
 	return map[string]interface{}{
 		"step":   step.Name,
 		"status": "completed",
 	}, nil
+}
+
+// Type definitions for placeholder activities
+type CodeReviewRequest struct {
+	Repository    string `json:"repository"`
+	Branch        string `json:"branch"`
+	CommitHash    string `json:"commit_hash"`
+	PostComments  bool   `json:"post_comments"`
+}
+
+type CodeChanges struct {
+	Files     []string `json:"files"`
+	Additions int      `json:"additions"`
+	Deletions int      `json:"deletions"`
+	Diff      string   `json:"diff"`
+}
+
+type AutomatedCheckResults struct {
+	Passed   bool          `json:"passed"`
+	Checks   []interface{} `json:"checks"`
+	Coverage float64       `json:"coverage"`
+}
+
+type AIReviewResult struct {
+	Issues      []interface{} `json:"issues"`
+	Suggestions []interface{} `json:"suggestions"`
+	CodeQuality float64       `json:"code_quality"`
+}
+
+type ReviewSummary struct {
+	Approved bool          `json:"approved"`
+	Comments []interface{} `json:"comments"`
+	Score    float64       `json:"score"`
+}
+
+type DeploymentRequest struct {
+	Version         string `json:"version"`
+	Environment     string `json:"environment"`
+	Repository      string `json:"repository"`
+	DeployToStaging bool   `json:"deploy_to_staging"`
+}
+
+type DeploymentValidation struct {
+	IsValid bool     `json:"is_valid"`
+	Errors  []string `json:"errors"`
+}
+
+type BuildResult struct {
+	ArtifactID string `json:"artifact_id"`
+	Version    string `json:"version"`
+	Size       int64  `json:"size"`
+}
+
+type TestResult struct {
+	Passed   bool    `json:"passed"`
+	Tests    int     `json:"tests"`
+	Failures int     `json:"failures"`
+	Coverage float64 `json:"coverage"`
+}
+
+type DeploymentResult struct {
+	DeploymentID string    `json:"deployment_id"`
+	Environment  string    `json:"environment"`
+	Version      string    `json:"version"`
+	URL          string    `json:"url"`
+	Timestamp    time.Time `json:"timestamp"`
+}
+
+type HealthCheckResult struct {
+	IsHealthy bool            `json:"is_healthy"`
+	Checks    map[string]bool `json:"checks"`
+}
+
+type CustomStep struct {
+	Name            string                 `json:"name"`
+	Config          map[string]interface{} `json:"config"`
+	TimeoutSeconds  int                    `json:"timeout_seconds"`
+	MaxRetries      int                    `json:"max_retries"`
+	ContinueOnError bool                   `json:"continue_on_error"`
 }

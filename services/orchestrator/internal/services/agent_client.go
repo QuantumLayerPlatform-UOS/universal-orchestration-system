@@ -499,6 +499,12 @@ type ExecuteTaskRequest struct {
 	MaxRetries int                    `json:"max_retries"`
 }
 
+type Capability struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Version     string `json:"version"`
+}
+
 type Agent struct {
 	ID           string                 `json:"id"`
 	Name         string                 `json:"name"`
@@ -506,7 +512,7 @@ type Agent struct {
 	Status       string                 `json:"status"`
 	ProjectID    string                 `json:"project_id"`
 	Config       map[string]interface{} `json:"config"`
-	Capabilities []string               `json:"capabilities"`
+	Capabilities []Capability           `json:"capabilities"`
 	Tags         []string               `json:"tags"`
 	CreatedAt    time.Time              `json:"created_at"`
 	UpdatedAt    time.Time              `json:"updated_at"`

@@ -610,86 +610,10 @@ type AnalysisReport struct {
 	Score       float64                `json:"score"`
 }
 
-type CodeReviewRequest struct {
-	PullRequestID string `json:"pull_request_id"`
-	Repository    string `json:"repository"`
-	BaseBranch    string `json:"base_branch"`
-	HeadBranch    string `json:"head_branch"`
-	PostComments  bool   `json:"post_comments"`
-}
+// Types are already defined in worker.go, so we don't need to redefine them here
 
-type CodeChanges struct {
-	Files    []string          `json:"files"`
-	Additions int              `json:"additions"`
-	Deletions int              `json:"deletions"`
-	Diff      string           `json:"diff"`
-}
-
-type AutomatedCheckResults struct {
-	Passed   bool              `json:"passed"`
-	Checks   []interface{}     `json:"checks"`
-	Coverage float64           `json:"coverage"`
-}
-
-type AIReviewResult struct {
-	Issues       []interface{}     `json:"issues"`
-	Suggestions  []interface{}     `json:"suggestions"`
-	CodeQuality  float64           `json:"code_quality"`
-}
-
-type ReviewSummary struct {
-	Approved     bool              `json:"approved"`
-	Comments     []interface{}     `json:"comments"`
-	Score        float64           `json:"score"`
-}
-
-type DeploymentRequest struct {
-	Environment     string            `json:"environment"`
-	Version         string            `json:"version"`
-	DeployToStaging bool              `json:"deploy_to_staging"`
-	Config          map[string]interface{} `json:"config"`
-}
-
-type DeploymentValidation struct {
-	IsValid bool     `json:"is_valid"`
-	Errors  []string `json:"errors"`
-}
-
-type BuildResult struct {
-	ArtifactID string `json:"artifact_id"`
-	Version    string `json:"version"`
-	Size       int64  `json:"size"`
-}
-
-type TestResult struct {
-	Passed   bool              `json:"passed"`
-	Tests    int               `json:"tests"`
-	Failures int               `json:"failures"`
-	Coverage float64           `json:"coverage"`
-}
-
-type DeploymentResult struct {
-	DeploymentID string    `json:"deployment_id"`
-	Environment  string    `json:"environment"`
-	Version      string    `json:"version"`
-	URL          string    `json:"url"`
-	Timestamp    time.Time `json:"timestamp"`
-}
-
-type HealthCheckResult struct {
-	IsHealthy bool              `json:"is_healthy"`
-	Checks    map[string]bool   `json:"checks"`
-}
+// HealthCheckResult and CustomStep types are already defined in worker.go
 
 type CustomWorkflowDefinition struct {
 	Steps []CustomStep `json:"steps"`
-}
-
-type CustomStep struct {
-	Name            string                 `json:"name"`
-	Type            string                 `json:"type"`
-	TimeoutSeconds  int                    `json:"timeout_seconds"`
-	MaxRetries      int                    `json:"max_retries"`
-	ContinueOnError bool                   `json:"continue_on_error"`
-	Config          map[string]interface{} `json:"config"`
 }
