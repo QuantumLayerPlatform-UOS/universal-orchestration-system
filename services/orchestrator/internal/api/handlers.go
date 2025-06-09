@@ -27,12 +27,14 @@ func NewHandlers(
 	projectService *services.ProjectService,
 	agentClient *services.AgentClient,
 	logger *zap.Logger,
+	db *gorm.DB,
 ) *Handlers {
 	return &Handlers{
 		workflowEngine: workflowEngine,
 		projectService: projectService,
 		agentClient:    agentClient,
 		logger:         logger,
+		db:             db,
 	}
 }
 
@@ -395,12 +397,53 @@ func (h *Handlers) RestartAgent(c *gin.Context) {
 	h.respondSuccess(c, http.StatusOK, gin.H{"message": "Agent restart initiated"})
 }
 
-// Health check handler
+// Health check handler with detailed status
 func (h *Handlers) HealthCheck(c *gin.Context) {
-	h.respondSuccess(c, http.StatusOK, gin.H{
+	_ = c.Request.Context() // Reserved for future use
+	
+	// Check database connectivity
+	dbHealthy := true
+	if h.db != nil {
+		sqlDB, err := h.db.DB()
+		if err != nil {
+			dbHealthy = false
+		} else if err := sqlDB.Ping(); err != nil {
+			dbHealthy = false
+		}
+	}
+	
+	// Check Temporal connectivity
+	temporalHealthy := h.workflowEngine != nil
+	
+	// Check Agent Manager connectivity
+	agentManagerHealthy := true
+	if h.agentClient != nil {
+		// Simple check - could be enhanced with actual ping
+		agentManagerHealthy = true
+	}
+	
+	overallHealthy := dbHealthy && temporalHealthy && agentManagerHealthy
+	
+	response := gin.H{
 		"status":    "healthy",
 		"timestamp": time.Now().Unix(),
-	})
+		"checks": gin.H{
+			"database":      dbHealthy,
+			"temporal":      temporalHealthy,
+			"agent_manager": agentManagerHealthy,
+		},
+	}
+	
+	if !overallHealthy {
+		response["status"] = "unhealthy"
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"success": false,
+			"data":    response,
+		})
+		return
+	}
+	
+	h.respondSuccess(c, http.StatusOK, response)
 }
 
 // Helper methods

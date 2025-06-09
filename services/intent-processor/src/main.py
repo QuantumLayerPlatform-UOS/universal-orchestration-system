@@ -26,6 +26,13 @@ from .models import (
 from .services.intent_analyzer import IntentAnalyzer
 from .services.mock_intent_analyzer import MockIntentAnalyzer
 from .services.prompt_manager import PromptManager
+from .utils.resilience import (
+    retry_with_backoff,
+    CircuitBreaker,
+    rate_limit,
+    timeout_wrapper,
+    HealthChecker
+)
 
 # Configure structured logging
 logHandler = logging.StreamHandler()
@@ -33,7 +40,7 @@ formatter = jsonlogger.JsonFormatter()
 logHandler.setFormatter(formatter)
 logger = logging.getLogger(__name__)
 logger.addHandler(logHandler)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG if os.getenv("LOG_LEVEL", "info").lower() == "debug" else logging.INFO)
 
 # Prometheus metrics
 registry = CollectorRegistry()
@@ -56,47 +63,59 @@ intent_processing_counter = Counter(
     registry=registry
 )
 
-# Initialize services
-intent_analyzer: IntentAnalyzer = None
-prompt_manager: PromptManager = None
+# Initialize services - Use app state instead of globals
+# intent_analyzer: IntentAnalyzer = None
+# prompt_manager: PromptManager = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application lifecycle"""
-    global intent_analyzer, prompt_manager
-    
     logger.info("Starting Intent Processor Service")
     
-    # Initialize services
-    try:
+    # Initialize health checker
+    app.state.health_checker = HealthChecker()
+    
+    # Initialize services with retry
+    @retry_with_backoff(retries=3, backoff_in_seconds=2)
+    async def initialize_services():
         # Check if Azure OpenAI credentials are available
         azure_key = os.getenv("AZURE_OPENAI_API_KEY", "")
         azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "")
         
         if azure_key and azure_endpoint and azure_key != "dummy-key":
             # Use real intent analyzer
-            prompt_manager = PromptManager()
-            intent_analyzer = IntentAnalyzer(prompt_manager)
-            await intent_analyzer.initialize()
+            app.state.prompt_manager = PromptManager()
+            app.state.intent_analyzer = IntentAnalyzer(app.state.prompt_manager)
+            await app.state.intent_analyzer.initialize()
             logger.info("Services initialized with Azure OpenAI")
         else:
             # Use mock analyzer for testing
-            intent_analyzer = MockIntentAnalyzer()
-            await intent_analyzer.initialize()
+            app.state.prompt_manager = PromptManager()  # Initialize prompt manager even for mock
+            app.state.intent_analyzer = MockIntentAnalyzer()
+            await app.state.intent_analyzer.initialize()
             logger.warning("Using mock intent analyzer (no Azure OpenAI credentials)")
-            
+        
+        # Register health checks
+        app.state.health_checker.register_check(
+            "intent_analyzer",
+            lambda: app.state.intent_analyzer.check_openai_health()
+        )
+        
         logger.info("Services initialized successfully")
+    
+    try:
+        await initialize_services()
     except Exception as e:
-        logger.error(f"Failed to initialize services: {str(e)}")
+        logger.error(f"Failed to initialize services after retries: {str(e)}")
         raise
     
     yield
     
     # Cleanup
     logger.info("Shutting down Intent Processor Service")
-    if intent_analyzer:
-        await intent_analyzer.cleanup()
+    if hasattr(app.state, 'intent_analyzer') and app.state.intent_analyzer:
+        await app.state.intent_analyzer.cleanup()
 
 
 # Create FastAPI application
@@ -163,28 +182,54 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 
 @app.get("/health", response_model=HealthResponse)
-async def health_check() -> HealthResponse:
-    """Health check endpoint"""
+async def health_check(request: Request) -> HealthResponse:
+    """Health check endpoint with detailed status"""
     try:
         # Check if services are initialized
-        services_healthy = intent_analyzer is not None and prompt_manager is not None
+        has_analyzer = hasattr(request.app.state, 'intent_analyzer') and request.app.state.intent_analyzer is not None
+        has_prompt_manager = hasattr(request.app.state, 'prompt_manager') and request.app.state.prompt_manager is not None
+        has_health_checker = hasattr(request.app.state, 'health_checker') and request.app.state.health_checker is not None
+        
+        services_healthy = has_analyzer and has_prompt_manager
+        
+        logger.debug(f"Health check - intent_analyzer: {has_analyzer}, prompt_manager: {has_prompt_manager}")
+        
+        # Run detailed health checks if available
+        detailed_checks = {}
+        if has_health_checker:
+            detailed_checks = await request.app.state.health_checker.run_checks()
         
         # Check Azure OpenAI connectivity
         openai_healthy = False
-        if intent_analyzer:
-            openai_healthy = await intent_analyzer.check_openai_health()
+        if has_analyzer:
+            try:
+                openai_healthy = await timeout_wrapper(
+                    request.app.state.intent_analyzer.check_openai_health(),
+                    timeout=3.0
+                )
+            except Exception as e:
+                logger.warning(f"OpenAI health check failed: {str(e)}")
+                openai_healthy = False
         
         is_healthy = services_healthy and openai_healthy
+        
+        logger.debug(f"Health check - services_healthy: {services_healthy}, openai_healthy: {openai_healthy}, is_healthy: {is_healthy}")
+        
+        dependencies = {
+            "services_initialized": services_healthy,
+            "azure_openai": openai_healthy
+        }
+        
+        # Add detailed checks to dependencies
+        if detailed_checks:
+            dependencies["detailed_checks"] = detailed_checks
         
         return HealthResponse(
             status="healthy" if is_healthy else "unhealthy",
             timestamp=datetime.utcnow(),
             service="intent-processor",
             version="1.0.0",
-            dependencies={
-                "services_initialized": services_healthy,
-                "azure_openai": openai_healthy
-            }
+            dependencies=dependencies
         )
     except Exception as e:
         logger.error(f"Health check failed: {str(e)}")
@@ -203,8 +248,12 @@ async def metrics():
     return generate_latest(registry)
 
 
+# Apply circuit breaker to the intent processing
+intent_processor_circuit = CircuitBreaker(failure_threshold=5, recovery_timeout=30)
+
 @app.post("/api/v1/process-intent", response_model=IntentResponse)
-async def process_intent(request: IntentRequest) -> IntentResponse:
+@rate_limit(rate=100, per=60.0)  # 100 requests per minute
+async def process_intent(request: IntentRequest, req: Request) -> IntentResponse:
     """
     Process natural language requirements and break them down into tasks
     
@@ -223,12 +272,20 @@ async def process_intent(request: IntentRequest) -> IntentResponse:
             }
         )
         
-        # Process the intent
-        result = await intent_analyzer.analyze_intent(
-            text=request.text,
-            context=request.context,
-            project_info=request.project_info
-        )
+        # Process the intent with timeout
+        @intent_processor_circuit
+        @retry_with_backoff(retries=2, backoff_in_seconds=1)
+        async def analyze_with_resilience():
+            return await timeout_wrapper(
+                req.app.state.intent_analyzer.analyze_intent(
+                    text=request.text,
+                    context=request.context,
+                    project_info=request.project_info
+                ),
+                timeout=10.0  # 10 second timeout
+            )
+        
+        result = await analyze_with_resilience()
         
         # Record success metric
         intent_processing_counter.labels(status="success").inc()
@@ -277,7 +334,7 @@ async def process_intent(request: IntentRequest) -> IntentResponse:
 
 
 @app.post("/api/v1/validate-tasks", response_model=Dict[str, Any])
-async def validate_tasks(tasks: TaskBreakdown) -> Dict[str, Any]:
+async def validate_tasks(tasks: TaskBreakdown, req: Request) -> Dict[str, Any]:
     """
     Validate a task breakdown for completeness and consistency
     
@@ -288,7 +345,7 @@ async def validate_tasks(tasks: TaskBreakdown) -> Dict[str, Any]:
         Validation results with any issues found
     """
     try:
-        validation_result = await intent_analyzer.validate_tasks(tasks)
+        validation_result = await req.app.state.intent_analyzer.validate_tasks(tasks)
         
         return {
             "valid": validation_result.is_valid,
@@ -306,10 +363,10 @@ async def validate_tasks(tasks: TaskBreakdown) -> Dict[str, Any]:
 
 
 @app.get("/api/v1/prompt-templates")
-async def get_prompt_templates() -> Dict[str, Any]:
+async def get_prompt_templates(req: Request) -> Dict[str, Any]:
     """Get available prompt templates"""
     try:
-        templates = prompt_manager.get_available_templates()
+        templates = req.app.state.prompt_manager.get_available_templates()
         return {
             "templates": templates,
             "timestamp": datetime.utcnow()

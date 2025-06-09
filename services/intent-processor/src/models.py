@@ -138,7 +138,7 @@ class HealthResponse(BaseModel):
     timestamp: datetime = Field(..., description="Check timestamp")
     service: str = Field(..., description="Service name")
     version: str = Field(..., description="Service version")
-    dependencies: Optional[Dict[str, bool]] = Field(None, description="Dependency health status")
+    dependencies: Optional[Dict[str, Any]] = Field(None, description="Dependency health status")
     error: Optional[str] = Field(None, description="Error message if unhealthy")
 
 

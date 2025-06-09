@@ -145,7 +145,7 @@ func main() {
 	defer workflowMonitor.Stop()
 
 	// Initialize handlers
-	handlers := api.NewHandlers(workflowEngine, projectService, agentClient, logger)
+	handlers := api.NewHandlers(workflowEngine, projectService, agentClient, logger, db)
 
 	// Setup routers
 	router := setupRouter(handlers, cfg, logger)
