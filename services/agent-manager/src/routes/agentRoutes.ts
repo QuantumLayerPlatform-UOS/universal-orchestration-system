@@ -234,5 +234,80 @@ export const agentRoutes = (
     }
   );
 
+  // Execute task on agent
+  router.post(
+    '/:agentId/execute',
+    validateRequest({
+      params: Joi.object({
+        agentId: Joi.string().required()
+      }),
+      body: Joi.object({
+        type: Joi.string().required(),
+        input: Joi.object().required(),
+        config: Joi.object().optional(),
+        priority: Joi.string().valid('critical', 'high', 'medium', 'low').optional(),
+        timeout: Joi.number().integer().min(1).max(3600).optional(), // 1 second to 1 hour
+        maxRetries: Joi.number().integer().min(0).max(5).optional()
+      })
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const agent = agentRegistry.getAgent(req.params.agentId);
+        
+        if (!agent) {
+          throw new NotFoundError('Agent');
+        }
+
+        if (agent.status !== AgentStatus.AVAILABLE) {
+          throw new ApiError(400, `Agent is not available (status: ${agent.status})`);
+        }
+
+        // Submit task to orchestrator for execution
+        const taskResult = await agentOrchestrator.submitTask({
+          type: agent.type,
+          priority: req.body.priority,
+          payload: {
+            agentId: agent.id,
+            executionType: req.body.type,
+            input: req.body.input,
+            config: req.body.config || {},
+            requestedAt: new Date().toISOString()
+          },
+          requiredCapabilities: agent.capabilities.map(cap => 
+            typeof cap === 'string' ? cap : cap.name
+          ),
+          metadata: {
+            source: 'agent-execution-api',
+            tags: [`agent:${agent.id}`, `execution:${req.body.type}`]
+          },
+          timeout: req.body.timeout ? req.body.timeout * 1000 : 300000, // Convert to ms
+          maxAttempts: req.body.maxRetries ? req.body.maxRetries + 1 : 1
+        });
+
+        // Return response in the format expected by orchestrator
+        const response = {
+          id: taskResult.id,
+          agent_id: agent.id,
+          type: req.body.type,
+          status: 'accepted',
+          input: req.body.input,
+          output: {
+            message: 'Task submitted for execution',
+            task_id: taskResult.id,
+            acceptance_status: 'queued'
+          },
+          error: '',
+          started_at: new Date().toISOString(),
+          completed_at: null,
+          duration: 0
+        };
+
+        res.status(202).json(response);
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
   return router;
 };
