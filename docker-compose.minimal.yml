@@ -120,6 +120,7 @@ services:
       - LLM_MAX_TOKENS=2000
       # Ollama
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-https://model.gonella.co.uk}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3:8b}
       - USE_OLLAMA=${USE_OLLAMA:-true}
       # Groq
       - GROQ_API_KEY=${GROQ_API_KEY}
@@ -206,6 +207,7 @@ services:
       - LLM_MAX_TOKENS=2000
       # Ollama
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-https://model.gonella.co.uk}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3:8b}
       - USE_OLLAMA=${USE_OLLAMA:-true}
       # Groq
       - GROQ_API_KEY=${GROQ_API_KEY}

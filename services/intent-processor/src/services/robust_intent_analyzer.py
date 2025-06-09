@@ -211,7 +211,8 @@ JSON Response:
         self,
         text: str,
         context: Optional[Dict[str, Any]],
-        project_info: Optional[Dict[str, Any]]
+        project_info: Optional[Dict[str, Any]],
+        request_id: Optional[str] = None
     ) -> Optional[IntentAnalysisResult]:
         """Use step-by-step guided generation"""
         
@@ -278,7 +279,8 @@ Summary:"""
         self,
         text: str,
         context: Optional[Dict[str, Any]],
-        project_info: Optional[Dict[str, Any]]
+        project_info: Optional[Dict[str, Any]],
+        request_id: Optional[str] = None
     ) -> Optional[IntentAnalysisResult]:
         """Use a simple prompt approach"""
         
@@ -305,7 +307,8 @@ Answer briefly:
         self,
         text: str,
         context: Optional[Dict[str, Any]],
-        project_info: Optional[Dict[str, Any]]
+        project_info: Optional[Dict[str, Any]],
+        request_id: Optional[str] = None
     ) -> IntentAnalysisResult:
         """Rule-based analysis with NLP techniques"""
         
@@ -359,7 +362,8 @@ Answer briefly:
         self,
         text: str,
         context: Optional[Dict[str, Any]],
-        project_info: Optional[Dict[str, Any]]
+        project_info: Optional[Dict[str, Any]],
+        request_id: Optional[str] = None
     ) -> IntentAnalysisResult:
         """Basic keyword-based analysis as final fallback"""
         

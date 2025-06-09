@@ -104,7 +104,8 @@ async def lifespan(app: FastAPI):
         from .services.llm_factory import llm_factory
         available_providers = await llm_factory.get_available_providers()
         if available_providers:
-            logger.info(f"Initialized with LLM providers: {', '.join(available_providers)}")
+            provider_names = [name for name, _ in available_providers] if isinstance(available_providers[0], tuple) else available_providers
+            logger.info(f"Initialized with LLM providers: {', '.join(provider_names)}")
         else:
             logger.warning("No LLM providers configured - using fallback analysis")
             logger.info("Configure one of: OLLAMA_BASE_URL, GROQ_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY")
