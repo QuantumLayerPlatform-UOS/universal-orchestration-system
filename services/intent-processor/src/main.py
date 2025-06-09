@@ -24,6 +24,7 @@ from .models import (
     TaskBreakdown
 )
 from .services.intent_analyzer import IntentAnalyzer
+from .services.mock_intent_analyzer import MockIntentAnalyzer
 from .services.prompt_manager import PromptManager
 
 # Configure structured logging
@@ -69,9 +70,22 @@ async def lifespan(app: FastAPI):
     
     # Initialize services
     try:
-        prompt_manager = PromptManager()
-        intent_analyzer = IntentAnalyzer(prompt_manager)
-        await intent_analyzer.initialize()
+        # Check if Azure OpenAI credentials are available
+        azure_key = os.getenv("AZURE_OPENAI_API_KEY", "")
+        azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "")
+        
+        if azure_key and azure_endpoint and azure_key != "dummy-key":
+            # Use real intent analyzer
+            prompt_manager = PromptManager()
+            intent_analyzer = IntentAnalyzer(prompt_manager)
+            await intent_analyzer.initialize()
+            logger.info("Services initialized with Azure OpenAI")
+        else:
+            # Use mock analyzer for testing
+            intent_analyzer = MockIntentAnalyzer()
+            await intent_analyzer.initialize()
+            logger.warning("Using mock intent analyzer (no Azure OpenAI credentials)")
+            
         logger.info("Services initialized successfully")
     except Exception as e:
         logger.error(f"Failed to initialize services: {str(e)}")

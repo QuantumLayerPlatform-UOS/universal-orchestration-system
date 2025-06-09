@@ -40,7 +40,9 @@ const AGENT_CONFIG = {
       name: 'template-generation',
       description: 'Generate code from templates',
       version: '1.0.0'
-    }
+    },
+    'javascript',  // Add language support
+    'multi-language'  // Support multiple languages
   ],
   status: 'idle'
 };

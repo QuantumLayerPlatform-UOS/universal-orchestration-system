@@ -85,6 +85,7 @@ services:
       - LOG_LEVEL=debug
       - ORCHESTRATOR_TELEMETRY_ENABLED=false
       - ORCHESTRATOR_TEMPORAL_HOST_PORT=temporal:7233
+      - ORCHESTRATOR_AGENT_MANAGER_BASE_URL=http://agent-manager:8082
     ports:
       - "8080:8080"
     depends_on:

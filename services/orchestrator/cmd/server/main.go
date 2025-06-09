@@ -133,6 +133,17 @@ func main() {
 		workflowConfig,
 	)
 
+	// Initialize workflow monitor
+	workflowMonitor := services.NewWorkflowMonitor(
+		db,
+		temporalWorker.GetClient(),
+		logger,
+		redisClient,
+		5*time.Second, // Check every 5 seconds
+	)
+	workflowMonitor.Start()
+	defer workflowMonitor.Stop()
+
 	// Initialize handlers
 	handlers := api.NewHandlers(workflowEngine, projectService, agentClient, logger)
 
