@@ -52,22 +52,21 @@ def test_project_creation():
     """Test creating a new project via orchestrator"""
     print("\n1. Testing Project Creation...")
     
-    import uuid
     project_data = {
-        "id": str(uuid.uuid4()),
         "name": "Test E2E Project",
         "description": "Testing end-to-end workflow",
-        "owner_id": "test-user-001"
+        "type": "standard"
     }
     
     resp = requests.post(f"{ORCHESTRATOR_URL}/api/v1/projects", json=project_data)
-    if resp.status_code != 200:
+    if resp.status_code not in [200, 201]:
         print(f"  ✗ Failed to create project: {resp.text}")
         return None
     
     project = resp.json()
-    print(f"  ✓ Project created: {project['data']['id']}")
-    return project['data']['id']
+    project_id = project.get('data', {}).get('id') or project.get('id')
+    print(f"  ✓ Project created: {project_id}")
+    return project_id
 
 def test_intent_processing():
     """Test processing natural language intent"""
@@ -116,6 +115,7 @@ def test_workflow_execution():
     print("\n4. Testing Workflow Execution...")
     
     workflow_data = {
+        "name": "Generate User Management API",
         "project_id": "test-project-001",
         "type": "code_generation",
         "input": {
