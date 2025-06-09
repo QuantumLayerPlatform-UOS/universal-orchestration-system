@@ -26,6 +26,7 @@ from ..models import (
     ValidationResult
 )
 from .prompt_manager import PromptManager
+from .llm_provider_factory import LLMProviderFactory
 
 logger = logging.getLogger(__name__)
 
@@ -35,20 +36,25 @@ class IntentAnalyzer:
     
     def __init__(self, prompt_manager: PromptManager):
         self.prompt_manager = prompt_manager
-        self.llm: Optional[AzureChatOpenAI] = None
+        self.llm_factory = LLMProviderFactory()
+        self.llm = None
         self.client: Optional[AzureOpenAI] = None
         
     async def initialize(self):
-        """Initialize the Azure OpenAI client"""
+        """Initialize the LLM client using the provider factory"""
         try:
-            # Initialize LangChain Azure OpenAI
-            self.llm = AzureChatOpenAI(
-                azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-                api_key=os.getenv("AZURE_OPENAI_API_KEY"),
-                api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-15-preview"),
-                deployment_name=os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME"),
-                temperature=0.7,
-                max_tokens=4000
+            # Get provider from environment or use default
+            provider = os.getenv('LLM_PROVIDER')
+            model = os.getenv('LLM_MODEL')
+            
+            logger.info(f"Initializing LLM with provider: {provider or self.llm_factory.default_provider}")
+            
+            # Create LLM instance using the factory
+            self.llm = self.llm_factory.create_llm(
+                provider=provider,
+                model=model,
+                temperature=float(os.getenv('LLM_TEMPERATURE', '0.7')),
+                max_tokens=int(os.getenv('LLM_MAX_TOKENS', '2000'))
             )
             
             # Initialize direct Azure OpenAI client for health checks

@@ -113,9 +113,24 @@ services:
       - REDIS_PASSWORD=redis123
       - AGENT_MANAGER_URL=http://agent-manager:8082
       - ORCHESTRATOR_URL=http://orchestrator:8080
-      - AZURE_OPENAI_API_KEY=dummy-key
-      - AZURE_OPENAI_ENDPOINT=https://dummy.openai.azure.com
-      - AZURE_OPENAI_DEPLOYMENT_NAME=gpt-35-turbo
+      # LLM Provider Configuration
+      - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
+      - LLM_MODEL=${LLM_MODEL:-mistral}
+      - LLM_TEMPERATURE=0.7
+      - LLM_MAX_TOKENS=2000
+      # Ollama
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-https://model.gonella.co.uk}
+      - USE_OLLAMA=${USE_OLLAMA:-true}
+      # Groq
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      # OpenAI
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      # Anthropic
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      # Azure OpenAI (fallback)
+      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY:-dummy-key}
+      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT:-https://dummy.openai.azure.com}
+      - AZURE_OPENAI_DEPLOYMENT_NAME=${AZURE_OPENAI_DEPLOYMENT_NAME:-gpt-35-turbo}
       - LOG_LEVEL=debug
     ports:
       - "8081:8081"
@@ -183,6 +198,21 @@ services:
       - NODE_ENV=production
       - META_AGENT_ID=meta-prompt-orchestrator
       - AGENT_MANAGER_URL=http://agent-manager:8082
+      # LLM Provider Configuration
+      - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
+      - LLM_MODEL=${LLM_MODEL:-mistral}
+      - LLM_TEMPERATURE=0.7
+      - LLM_MAX_TOKENS=2000
+      # Ollama
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-https://model.gonella.co.uk}
+      - USE_OLLAMA=${USE_OLLAMA:-true}
+      # Groq
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      # OpenAI
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      # Anthropic
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      # Azure OpenAI (fallback)
       - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY:-dummy-key}
       - AZURE_OPENAI_INSTANCE_NAME=${AZURE_OPENAI_INSTANCE_NAME:-dummy-instance}
       - AZURE_OPENAI_DEPLOYMENT_NAME=${AZURE_OPENAI_DEPLOYMENT_NAME:-gpt-35-turbo}

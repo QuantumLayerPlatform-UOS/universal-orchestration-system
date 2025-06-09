@@ -11,6 +11,9 @@ azure-identity==1.15.0
 # LangChain for prompt engineering
 langchain==0.1.0
 langchain-openai==0.0.2
+langchain-anthropic==0.1.0
+langchain-groq==0.0.1
+langchain-community==0.0.10
 
 # Async support
 httpx==0.25.2

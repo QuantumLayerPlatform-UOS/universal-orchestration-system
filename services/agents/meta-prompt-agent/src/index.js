@@ -69,12 +69,21 @@ class MetaPromptOrchestrator {
     this.activeAgents = new Map();
     this.taskQueue = [];
     
-    // Initialize meta-prompt engine
+    // Initialize meta-prompt engine with flexible LLM provider
     this.promptEngine = new MetaPromptEngine({
+      // LLM provider configuration
+      llmProvider: process.env.LLM_PROVIDER, // ollama, groq, openai, anthropic, azure
+      llmModel: process.env.LLM_MODEL,
+      
+      // Legacy Azure OpenAI support
       azureOpenAIApiKey: process.env.AZURE_OPENAI_API_KEY,
       azureOpenAIInstanceName: process.env.AZURE_OPENAI_INSTANCE_NAME,
       azureOpenAIDeploymentName: process.env.AZURE_OPENAI_DEPLOYMENT_NAME,
-      azureOpenAIApiVersion: process.env.AZURE_OPENAI_API_VERSION
+      azureOpenAIApiVersion: process.env.AZURE_OPENAI_API_VERSION,
+      
+      // General configuration
+      temperature: parseFloat(process.env.LLM_TEMPERATURE || '0.7'),
+      maxTokens: parseInt(process.env.LLM_MAX_TOKENS || '2000')
     });
 
     // Initialize agent spawner
@@ -107,7 +116,7 @@ class MetaPromptOrchestrator {
   async registerAgent() {
     try {
       logger.info('Registering meta-prompt orchestrator');
-      const response = await axios.post(`${AGENT_MANAGER_URL}/api/v1/agents`, {
+      await axios.post(`${AGENT_MANAGER_URL}/api/v1/agents`, {
         ...META_AGENT_CONFIG,
         endpoint: `${AGENT_MANAGER_URL}/agents/${META_AGENT_CONFIG.id}`,
         region: 'global',

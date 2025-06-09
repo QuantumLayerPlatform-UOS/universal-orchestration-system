@@ -1,6 +1,6 @@
-const { ChatOpenAI } = require('@langchain/openai');
 const { SystemMessage, HumanMessage } = require('langchain/schema');
 const winston = require('winston');
+const LLMProviderFactory = require('./LLMProviderFactory');
 
 class MetaPromptEngine {
   constructor(config) {
@@ -14,14 +14,23 @@ class MetaPromptEngine {
       transports: [new winston.transports.Console()]
     });
 
+    // Initialize LLM provider factory
+    this.llmFactory = new LLMProviderFactory();
+    
+    // Get the default LLM or use specified provider
+    const provider = config.llmProvider || this.llmFactory.defaultProvider;
+    const model = config.llmModel;
+    
+    this.logger.info('Initializing MetaPromptEngine with LLM provider', { provider, model });
+    
     // Initialize LLM for meta-prompt processing
-    this.llm = new ChatOpenAI({
-      azureOpenAIApiKey: config.azureOpenAIApiKey,
-      azureOpenAIApiInstanceName: config.azureOpenAIInstanceName,
-      azureOpenAIApiDeploymentName: config.azureOpenAIDeploymentName,
-      azureOpenAIApiVersion: config.azureOpenAIApiVersion || '2023-05-15',
-      temperature: 0.7,
-      maxTokens: 2000
+    this.llm = this.llmFactory.createLLM({
+      provider,
+      model,
+      config: {
+        temperature: config.temperature || 0.7,
+        maxTokens: config.maxTokens || 2000
+      }
     });
 
     // Meta-prompt templates for different purposes
@@ -257,16 +266,20 @@ Return as structured workflow definition.`
    * Create an LLM instance with specific behavior modifiers
    */
   createAgentLLM(behaviorModifiers = {}) {
-    return new ChatOpenAI({
-      azureOpenAIApiKey: this.config.azureOpenAIApiKey,
-      azureOpenAIApiInstanceName: this.config.azureOpenAIInstanceName,
-      azureOpenAIApiDeploymentName: this.config.azureOpenAIDeploymentName,
-      azureOpenAIApiVersion: this.config.azureOpenAIApiVersion || '2023-05-15',
-      temperature: behaviorModifiers.temperature || 0.7,
-      maxTokens: behaviorModifiers.maxTokens || 1000,
-      topP: behaviorModifiers.topP || 1,
-      frequencyPenalty: behaviorModifiers.frequencyPenalty || 0,
-      presencePenalty: behaviorModifiers.presencePenalty || 0
+    // Allow agents to specify their preferred provider/model
+    const provider = behaviorModifiers.provider || this.config.llmProvider || this.llmFactory.defaultProvider;
+    const model = behaviorModifiers.model || this.config.llmModel;
+    
+    return this.llmFactory.createLLM({
+      provider,
+      model,
+      config: {
+        temperature: behaviorModifiers.temperature || 0.7,
+        maxTokens: behaviorModifiers.maxTokens || 1000,
+        topP: behaviorModifiers.topP || 1,
+        frequencyPenalty: behaviorModifiers.frequencyPenalty || 0,
+        presencePenalty: behaviorModifiers.presencePenalty || 0
+      }
     });
   }
 
