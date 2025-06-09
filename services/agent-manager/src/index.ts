@@ -13,6 +13,8 @@ import { agentRoutes } from './routes/agentRoutes';
 import { healthRoutes } from './routes/healthRoutes';
 import { taskRoutes } from './routes/taskRoutes';
 import { AgentRegistry } from './services/agentRegistry';
+import { AgentRepository } from './repositories/agentRepository';
+import { DatabaseManager } from './config/database';
 import { AgentOrchestrator } from './services/agentOrchestrator';
 import { AgentCommunicator } from './services/agentCommunicator';
 import { TaskQueue } from './queues/taskQueue';
@@ -48,11 +50,13 @@ class AgentManagerServer {
   private app: Application;
   private httpServer: any;
   private io: SocketIOServer;
-  private agentRegistry: AgentRegistry;
-  private agentOrchestrator: AgentOrchestrator;
-  private agentCommunicator: AgentCommunicator;
-  private taskQueue: TaskQueue;
-  private mongoService: MongoDBService;
+  private agentRegistry!: AgentRegistry;
+  private agentRepository!: AgentRepository;
+  private dbManager!: DatabaseManager;
+  private agentOrchestrator!: AgentOrchestrator;
+  private agentCommunicator!: AgentCommunicator;
+  private taskQueue!: TaskQueue;
+  private mongoService!: MongoDBService;
   private metricsService: MetricsService;
 
   constructor() {
@@ -67,15 +71,7 @@ class AgentManagerServer {
       transports: ['websocket', 'polling']
     });
 
-    // Initialize services
-    this.mongoService = new MongoDBService();
-    this.taskQueue = new TaskQueue();
-    this.agentRegistry = new AgentRegistry(this.mongoService);
-    this.agentOrchestrator = new AgentOrchestrator(
-      this.agentRegistry,
-      this.taskQueue
-    );
-    this.agentCommunicator = new AgentCommunicator(this.io, this.agentRegistry);
+    // Services will be initialized in start() method
     this.metricsService = new MetricsService();
   }
 
@@ -208,17 +204,50 @@ class AgentManagerServer {
 
   public async start(): Promise<void> {
     try {
-      // Connect to MongoDB
-      await this.mongoService.connect();
-      logger.info('Connected to MongoDB');
+      // Initialize database connections
+      this.dbManager = new DatabaseManager({
+        mongoUri: process.env.MONGODB_URI || '',
+        dbName: process.env.MONGODB_DB_NAME || 'agent_manager',
+        redisUrl: process.env.REDIS_URL || ''
+      });
+      await this.dbManager.connect();
+      logger.info('Database connections established');
 
-      // Initialize agent registry
+      // Initialize MongoDB service for compatibility
+      this.mongoService = new MongoDBService();
+      this.mongoService.setDb(this.dbManager.getDb());
+
+      // Initialize agent repository
+      this.agentRepository = new AgentRepository({
+        db: this.dbManager.getDb(),
+        redis: this.dbManager.getRedis(),
+        cachePrefix: 'agent:',
+        cacheTTL: 300
+      });
+      await this.agentRepository.initialize();
+
+      // Initialize distributed agent registry
+      this.agentRegistry = new AgentRegistry({
+        repository: this.agentRepository,
+        redis: this.dbManager.getRedis(),
+        heartbeatTimeout: 30000,
+        heartbeatCheckInterval: 10000,
+        syncInterval: 5000
+      });
       await this.agentRegistry.initialize();
-      logger.info('Agent registry initialized');
+      logger.info('Agent registry initialized with distributed support');
 
       // Initialize task queue
+      this.taskQueue = new TaskQueue();
       await this.taskQueue.initialize();
       logger.info('Task queue initialized');
+
+      // Initialize other services
+      this.agentOrchestrator = new AgentOrchestrator(
+        this.agentRegistry,
+        this.taskQueue
+      );
+      this.agentCommunicator = new AgentCommunicator(this.io, this.agentRegistry);
 
       // Setup middleware and routes
       this.setupMiddleware();
@@ -245,8 +274,9 @@ class AgentManagerServer {
         // Stop task queue
         await this.taskQueue.close();
         
-        // Disconnect from MongoDB
-        await this.mongoService.disconnect();
+        // Cleanup services
+        await this.agentRegistry.cleanup();
+        await this.dbManager.disconnect();
         
         logger.info('Agent Manager service shut down successfully');
       });

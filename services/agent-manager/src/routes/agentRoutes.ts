@@ -146,11 +146,8 @@ export const agentRoutes = (
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
-        const healthCheck = await agentRegistry.performHealthCheck(
-          req.params.agentId
-        );
-
-        res.json({ healthCheck });
+        // Health check functionality not yet implemented
+        throw new ApiError(501, 'Health check not implemented');
       } catch (error) {
         next(error);
       }
